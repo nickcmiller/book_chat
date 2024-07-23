@@ -67,33 +67,24 @@ def create_hierarchy(content):
     return hierarchy
 
 def _create_word_to_num_dict():
-    word_to_num = {
-        'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5',
-        'six': '6', 'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10',
-        'eleven': '11', 'twelve': '12', 'thirteen': '13', 'fourteen': '14', 'fifteen': '15',
-        'sixteen': '16', 'seventeen': '17', 'eighteen': '18', 'nineteen': '19', 'twenty': '20',
-        'thirty': '30', 'forty': '40', 'fifty': '50', 'sixty': '60', 'seventy': '70',
-        'eighty': '80', 'ninety': '90', 'hundred': '100'
-    }
-
-    # Add compound numbers
-    for tens in ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']:
-        for ones in range(1, 10):
-            compound = f"{tens}-{num2words(ones)}"
-            word_to_num[compound] = str(int(word_to_num[tens]) + ones)
-            compound = f"{tens} {num2words(ones)}"
-            word_to_num[compound] = str(int(word_to_num[tens]) + ones)
-
-    # Add numbers 100-300
+    # Generate numbers 1-100 and their word representations
+    word_to_num = {num2words(i): str(i) for i in range(1, 101)}
+    
+    # Add hyphenated versions for 21-99
+    word_to_num.update({num2words(i).replace(' ', '-'): str(i) for i in range(21, 100)})
+    
+    # Add 'hundred' and variations for 100-300
     for i in range(1, 4):
-        hundreds = num2words(i * 100)
-        word_to_num[hundreds] = str(i * 100)
-        word_to_num[f'{hundreds} and'] = str(i * 100)
+        base = i * 100
+        word_to_num[num2words(base)] = str(base)
+        word_to_num[f'{num2words(base)} and'] = str(base)
+        
         for j in range(1, 100):
-            word = num2words(i * 100 + j).replace(' and ', ' ')
-            word_to_num[word] = str(i * 100 + j)
-            word_to_num[word.replace(' ', '-')] = str(i * 100 + j)
-
+            num = base + j
+            word = num2words(num).replace(' and ', ' ')
+            word_to_num[word] = str(num)
+            word_to_num[word.replace(' ', '-')] = str(num)
+    
     return word_to_num
 
 def add_hierarchy_keys(hierarchy):
