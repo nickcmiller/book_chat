@@ -1,3 +1,6 @@
 ebooklib
 beautifulsoup4
 num2words
+openai
+python-dotenv
+tiktoken

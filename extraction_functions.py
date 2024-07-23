@@ -1,6 +1,13 @@
 from bs4 import BeautifulSoup
 import re
 from num2words import num2words
+import tiktoken
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from genai_toolbox.text_prompting.model_calls import openai_text_response
+from genai_toolbox.helper_functions.string_helpers import evaluate_and_clean_valid_response
 
 with open('extracted_documents/22_document.html', 'r') as file:
     html_content = file.read()
@@ -59,7 +66,7 @@ def create_hierarchy(content):
     
     return hierarchy
 
-def create_word_to_num_dict():
+def _create_word_to_num_dict():
     word_to_num = {
         'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5',
         'six': '6', 'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10',
@@ -89,11 +96,43 @@ def create_word_to_num_dict():
 
     return word_to_num
 
+def add_hierarchy_keys(hierarchy):
+    def traverse(items, current_section=None, current_subsection=None):
+        for item in items:
+            if item['type'] == 'section':
+                current_section = item['heading']
+                item['section'] = current_section
+                if 'content' in item:
+                    traverse(item['content'], current_section)
+            elif item['type'] == 'subsection':
+                current_subsection = item['heading']
+                item['section'] = current_section
+                item['subsection'] = current_subsection
+                if 'content' in item:
+                    traverse(item['content'], current_section, current_subsection)
+            else:
+                item['section'] = current_section
+                item['subsection'] = current_subsection
+    
+    traverse(hierarchy)
+    return hierarchy
+
+# def get_first_10_lines(file_path):
+#     with open(file_path, 'r') as file:
+#         lines = file.readlines()
+#         return lines[:10]
+
+# def clean_text(text):
+#     # Remove HTML tags and special characters
+#     clean = re.sub('<[^<]+?>', '', text)
+#     clean = re.sub(r'\s+', ' ', clean).strip()
+#     return clean
+
 def identify_chapter_and_title(hierarchy):
     chapter = None
     title = None
     
-    word_to_num = create_word_to_num_dict()
+    word_to_num = _create_word_to_num_dict()
     
     # Compile a regex pattern for matching word numbers
     word_pattern = r'\b(' + '|'.join(re.escape(key) for key in word_to_num.keys()) + r')\b'
@@ -128,48 +167,33 @@ def identify_chapter_and_title(hierarchy):
                 break
     
     # If we still don't have a title, check the content for a span with class 'heading_break1'
-    if not title:
-        for item in hierarchy:
-            if 'content' in item:
-                for content_item in item['content']:
-                    if content_item.get('type') == 'span' and 'heading_break1' in content_item.get('class', []):
-                        title = content_item.get('text', '').strip()
-                        if title:
-                            break
-                if title:
-                    break
+    def extract_text_with_structure(element):
+        if isinstance(element, NavigableString):
+            return str(element)
+        elif element.name in ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'li']:
+            return element.get_text(separator=' ', strip=False) + '\n\n'
+        else:
+            return ''.join(extract_text_with_structure(child) for child in element.children)
+
+    text = extract_text_with_structure(soup.body)
+    first_10_lines = get_first_10_lines('extracted_documents/22_document.txt')
+    prompt = f"""
+    This is the first 10 lines of the chapter: {first_10_lines}.
+    
+    What is the chapter and title of this chapter?
+
+    Return only JSON in a dictionary like this:
+    {{
+        "chapter": "Chapter 1",
+        "title": "The First Chapter"
+    }}
+    """
+    response = openai_text_response(prompt, model_choice="4o-mini")
+    print(response)
+    print(evaluate_and_clean_valid_response(response, dict))
+    
     
     return chapter, title
-
-def add_hierarchy_keys(hierarchy, chapter, title):
-    def traverse(items, current_section=None, current_subsection=None):
-        for item in items:
-            item['chapter'] = chapter
-            item['title'] = title
-            
-            if item['type'] == 'section':
-                current_section = item['heading']
-                item['section'] = current_section
-                if 'content' in item:
-                    traverse(item['content'], current_section)
-            elif item['type'] == 'subsection':
-                current_subsection = item['heading']
-                item['section'] = current_section
-                item['subsection'] = current_subsection
-                if 'content' in item:
-                    traverse(item['content'], current_section, current_subsection)
-            else:
-                item['section'] = current_section
-                item['subsection'] = current_subsection
-    
-    traverse(hierarchy)
-    return hierarchy
-
-def clean_text(text):
-    # Remove HTML tags and special characters
-    clean = re.sub('<[^<]+?>', '', text)
-    clean = re.sub(r'\s+', ' ', clean).strip()
-    return clean
 
 if __name__ == "__main__":
     import json
@@ -177,14 +201,10 @@ if __name__ == "__main__":
     soup = parse_html(html_content)
     content = extract_content(soup)
     hierarchy = create_hierarchy(content)
-    chapter, title = identify_chapter_and_title(hierarchy)
-    print(f"Chapter: {chapter}")
-    print(f"Title: {title}")
-    # new_hierarchy = add_hierarchy_keys(hierarchy, chapter, title)
+    new_hierarchy = add_hierarchy_keys(hierarchy)
     
-
     with open('content.json', 'w') as file:
         json.dump(content, file, indent=4, ensure_ascii=False)
 
     with open('hierarchy.json', 'w') as file:
-        json.dump(hierarchy, file, indent=4, ensure_ascii=False)
+        json.dump(new_hierarchy, file, indent=4, ensure_ascii=False)

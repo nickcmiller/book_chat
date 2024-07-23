@@ -8,7 +8,7 @@ book_2 = '../the-code-breaker-jennifer-doudna-gene-editing-and--annas-archive--l
 book_3 = '../the-first-tycoon-the-epic-life-of-cornelius copy.epub'
 
 # Open the EPUB file
-book = epub.read_epub(book_3, options={"ignore_ncx": True})
+book = epub.read_epub(book_1, options={"ignore_ncx": True})
 
 # Create a directory to store the extracted chapters
 output_dir = 'extracted_documents'
@@ -28,7 +28,7 @@ for i, item in enumerate(book.get_items()):
             if isinstance(element, NavigableString):
                 return str(element)
             elif element.name in ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'li']:
-                return element.get_text(separator=' ', strip=False) + '\n'
+                return element.get_text(separator=' ', strip=False) + '\n\n'
             else:
                 return ''.join(extract_text_with_structure(child) for child in element.children)
 
@@ -37,11 +37,11 @@ for i, item in enumerate(book.get_items()):
         html = soup.prettify()
         
         # Generate filenames for the chapter
-        filename = f'{i+1}_document.txt'
-        text_filepath = os.path.join(output_dir, filename)
+        text_filename = f'{i+1}_document.txt'
+        text_filepath = os.path.join(output_dir, text_filename)
         
-        filename = f'{i+1}_document.html'
-        html_filepath = os.path.join(output_dir, filename)
+        html_filename = f'{i+1}_document.html'
+        html_filepath = os.path.join(output_dir, html_filename)
         
         # Save the extracted text to a file
         with open(text_filepath, 'w', encoding='utf-8') as f:
@@ -50,4 +50,4 @@ for i, item in enumerate(book.get_items()):
         with open(html_filepath, 'w', encoding='utf-8') as f:
             f.write(html)
         
-        print(f"Extracted: {filename}\n{type(item)}")
+        print(f"Extracted: {text_filename}\n{type(item)}")
