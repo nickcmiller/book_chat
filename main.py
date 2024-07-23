@@ -1,34 +1,53 @@
 import ebooklib
 from ebooklib import epub
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 import os
 
+book_1 = '../the-philosophical-baby-alison-gopnik-first-edition copy.epub'
+book_2 = '../the-code-breaker-jennifer-doudna-gene-editing-and--annas-archive--libgenrs-nf-2933774 copy.epub'
+book_3 = '../the-first-tycoon-the-epic-life-of-cornelius copy.epub'
+
 # Open the EPUB file
-book = epub.read_epub('../the-philosophical-baby-alison-gopnik-first-edition Copy.epub', options={"ignore_ncx": True})
-print(type(book))
+book = epub.read_epub(book_3, options={"ignore_ncx": True})
 
 # Create a directory to store the extracted chapters
-output_dir = 'extracted_chapters'
+output_dir = 'extracted_documents'
 os.makedirs(output_dir, exist_ok=True)
 
-# Iterate through the chapters
 for i, item in enumerate(book.get_items()):
+    # print(f"Item {i+1}: Type = {item.get_type()}")
     if item.get_type() == ebooklib.ITEM_DOCUMENT:
-        # Process the chapter content
+        # Process each document in the directory
         content = item.get_content()
         
         # Parse HTML content
         soup = BeautifulSoup(content, 'html.parser')
         
-        # Extract text from HTML
-        text = soup.get_text()
+        # Extract text from HTML, preserving structure
+        def extract_text_with_structure(element):
+            if isinstance(element, NavigableString):
+                return str(element)
+            elif element.name in ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'li']:
+                return element.get_text(separator=' ', strip=False) + '\n'
+            else:
+                return ''.join(extract_text_with_structure(child) for child in element.children)
+
+        text = extract_text_with_structure(soup.body)
+
+        html = soup.prettify()
         
-        # Generate a filename for the chapter
-        filename = f'chapter_{i+1}.txt'
-        filepath = os.path.join(output_dir, filename)
+        # Generate filenames for the chapter
+        filename = f'{i+1}_document.txt'
+        text_filepath = os.path.join(output_dir, filename)
+        
+        filename = f'{i+1}_document.html'
+        html_filepath = os.path.join(output_dir, filename)
         
         # Save the extracted text to a file
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(text_filepath, 'w', encoding='utf-8') as f:
             f.write(text)
         
-        print(f"Extracted: {filename}")
+        with open(html_filepath, 'w', encoding='utf-8') as f:
+            f.write(html)
+        
+        print(f"Extracted: {filename}\n{type(item)}")
