@@ -1,15 +1,72 @@
 from bs4 import BeautifulSoup, NavigableString, Tag
 import re
 import json
-from num2words import num2words
 from dotenv import load_dotenv
 from typing import List, Dict, Tuple, Optional, Any
 import logging
+import os
+import ebooklib
 
 load_dotenv()
 
-from genai_toolbox.text_prompting.model_calls import openai_text_response
-from genai_toolbox.helper_functions.string_helpers import evaluate_and_clean_valid_response
+def extract_metadata(book):
+    metadata = {}
+    metadata['title'] = book.get_metadata('DC', 'title')
+    metadata['creator'] = book.get_metadata('DC', 'creator')
+    metadata['language'] = book.get_metadata('DC', 'language')
+    metadata['identifier'] = book.get_metadata('DC', 'identifier')
+    metadata['publisher'] = book.get_metadata('DC', 'publisher')
+    metadata['date'] = book.get_metadata('DC', 'date')
+    return {k: v[0][0] if v else None for k, v in metadata.items()}
+
+def create_toc_mapping(book):
+    ncx_item = next((item for item in book.get_items() if item.get_type() == ebooklib.ITEM_NAVIGATION), None)
+    if not ncx_item:
+        return None
+
+    ncx_content = ncx_item.get_content().decode('utf-8')
+    soup = BeautifulSoup(ncx_content, 'xml')
+    nav_points = soup.find_all('navPoint')
+
+    toc_mapping = {}
+
+    def process_nav_point(nav_point):
+        label = nav_point.navLabel.text.strip()
+        content = nav_point.content['src']
+        toc_mapping[content] = label  # Swap the key and value
+        for child in nav_point.find_all('navPoint', recursive=False):
+            process_nav_point(child)
+
+    for nav_point in nav_points:
+        process_nav_point(nav_point)
+
+    return toc_mapping
+
+def eliminate_fragments(toc_mapping):
+    return {file: title for file, title in toc_mapping.items() if '#' not in file}
+
+def toc_to_text(book):
+    output = []
+    output.append(f"Book Title: {book.get_metadata('DC', 'title')[0][0]}")
+    output.append(f"Author: {book.get_metadata('DC', 'creator')[0][0]}")
+    
+    toc_mapping = create_toc_mapping(book)
+    
+    if toc_mapping:
+        output.append("\nTable of Contents:")
+        current_chapter = None
+        for title, file in toc_mapping.items():
+            if '#' not in file:
+                current_chapter = title
+                output.append(f"{title}")
+            elif current_chapter:
+                output.append(f"  - {title}")
+            else:
+                output.append(f"{title}")
+    else:
+        output.append("\nNo NCX file found or unable to create mapping.")
+    
+    return "\n".join(output)
 
 def extract_text_with_structure(
     element: NavigableString | Tag
@@ -118,6 +175,23 @@ def extract_paragraphs(
 
     traverse(hierarchy)
     return paragraphs
+
+def safe_write_file(content, file_path, file_type='json'):
+    base, ext = os.path.splitext(file_path)
+    counter = 1
+    new_file_path = file_path
+
+    while os.path.exists(new_file_path):
+        new_file_path = f"{base}_{counter}{ext}"
+        counter += 1
+
+    with open(new_file_path, 'w', encoding='utf-8') as f:
+        if file_type == 'json':
+            json.dump(content, f, indent=4, ensure_ascii=False)
+        else:
+            f.write(content)
+
+    return new_file_path
 
 if __name__ == "__main__":
     import json
