@@ -43,7 +43,12 @@ def create_toc_mapping(book):
     return toc_mapping
 
 def eliminate_fragments(toc_mapping):
-    return {file: title for file, title in toc_mapping.items() if '#' not in file}
+    chapter_mapping = {}
+    for file, title in toc_mapping.items():
+        base_file = file.split('#')[0]
+        if base_file not in chapter_mapping:
+            chapter_mapping[base_file] = title
+    return chapter_mapping
 
 def toc_to_text(book):
     output = []
