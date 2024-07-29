@@ -17,15 +17,26 @@ from extraction_functions import (
     extract_metadata
 )
 import logging
+from typing import List, Dict, Any
 
 logging.basicConfig(level=logging.INFO)
 
-def setup_output_directory(book_name):
-    output_dir = os.path.join('extracted_documents', book_name)
+EXTRACTED_DIR = 'extracted_documents'
+
+def setup_output_directory(
+    book_name: str
+) -> str:
+    output_dir = os.path.join(EXTRACTED_DIR, book_name)
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
 
-def process_chapter(item, chapter_mapping, metadata, output_dir, i):
+def process_chapter(
+    item: epub.EpubItem,
+    chapter_mapping: dict,
+    metadata: dict,
+    output_dir: str,
+    i: int
+) -> List[Dict[str, Any]]:
     file_name = item.get_name()
     chapter_title = chapter_mapping.get(file_name)
     
@@ -48,7 +59,14 @@ def process_chapter(item, chapter_mapping, metadata, output_dir, i):
 
     return paragraphs
 
-def save_chapter_files(text, hierarchy, paragraphs, output_dir, i, safe_chapter_title):
+def save_chapter_files(
+    text: str,
+    hierarchy: dict,
+    paragraphs: List[Dict[str, Any]],
+    output_dir: str,
+    i: int,
+    safe_chapter_title: str
+) -> None:
     text_filename = f"{i}_{safe_chapter_title}.txt"
     text_filepath = os.path.join(output_dir, text_filename)
     safe_write_file(text, text_filepath, file_type='text')
@@ -61,7 +79,9 @@ def save_chapter_files(text, hierarchy, paragraphs, output_dir, i, safe_chapter_
     paragraphs_filepath = os.path.join(output_dir, paragraphs_filename)
     safe_write_file(paragraphs, paragraphs_filepath)
 
-def process_book(book_path):
+def process_book(
+    book_path: str
+) -> None:
     logging.info(f"Processing book: {book_path}")
     book = epub.read_epub(book_path)
     
@@ -87,14 +107,20 @@ def process_book(book_path):
     save_consolidated_paragraphs(all_paragraphs, book_name, output_dir)
     logging.info(f"Finished processing book: {book_path}")
 
-def save_consolidated_paragraphs(all_paragraphs, book_name, output_dir):
+def save_consolidated_paragraphs(
+    all_paragraphs: List[Dict[str, Any]],
+    book_name: str,
+    output_dir: str
+) -> None:
     print(f"Number of paragraphs: {len(all_paragraphs)}")
     consolidated_filename = f'{book_name}_all_paragraphs.json'
     consolidated_filepath = os.path.join(output_dir, consolidated_filename)
-    safe_write_file(all_paragraphs, f"extracted_documents/{book_name}_all_paragraphs.json")
+    safe_write_file(all_paragraphs, f"{EXTRACTED_DIR}/{book_name}_all_paragraphs.json")
     logging.info(f"Consolidated paragraphs saved to: {consolidated_filepath}")
 
-def process_books(book_paths):
+def process_books(
+    book_paths: List[str]
+) -> None:
     for book_path in book_paths:
         process_book(book_path)
 
