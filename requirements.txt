@@ -3,4 +3,5 @@ beautifulsoup4
 num2words
 openai
 python-dotenv
+streamlit
 tiktoken

@@ -1,16 +1,17 @@
 from bs4 import BeautifulSoup, NavigableString, Tag
+import ebooklib
+from ebooklib import epub
+from dotenv import load_dotenv
+load_dotenv()
+
+from genai_toolbox.chunk_and_embed.embedding_functions import num_tokens_from_string
+
+from typing import List, Dict, Any, Optional 
 import re
 import json
-from dotenv import load_dotenv
 from typing import List, Dict, Tuple, Optional, Any
 import logging
 import os
-import ebooklib
-import epub
-from epub import EpubBook
-from typing import List, Dict, Any, Optional 
-
-load_dotenv()
 
 def extract_metadata(
     book: epub.EpubBook
@@ -294,29 +295,31 @@ def extract_paragraphs(
     hierarchy: List[Dict[str, Any]],
     chapter: Optional[str] = None,
     author: Optional[str] = None,
-    title: Optional[str] = None
+    publisher: Optional[str] = None,
+    title: Optional[str] = None,
+    min_paragraph_tokens: int = 15
 ) -> List[Dict[str, Any]]:
     """
-    Extracts paragraphs from the provided hierarchical structure.
+        Extracts paragraphs from the provided hierarchical structure.
 
-    This function traverses the hierarchy of sections and subsections, 
-    extracting paragraphs and associating them with their respective chapter, 
-    author, and title information. Each paragraph is represented as a dictionary 
-    containing its text and metadata.
+        This function traverses the hierarchy of sections and subsections, 
+        extracting paragraphs and associating them with their respective chapter, 
+        author, and title information. Each paragraph is represented as a dictionary 
+        containing its text and metadata.
 
-    Args:
-        hierarchy (List[Dict[str, Any]]): A list of dictionaries representing 
-            the hierarchical structure of the content, where each dictionary 
-            can represent a section, subsection, or paragraph.
-        chapter (Optional[str]): The title of the chapter from which the 
-            paragraphs are extracted. Defaults to None.
-        author (Optional[str]): The author of the content. Defaults to None.
-        title (Optional[str]): The title of the content. Defaults to None.
+        Args:
+            hierarchy (List[Dict[str, Any]]): A list of dictionaries representing 
+                the hierarchical structure of the content, where each dictionary 
+                can represent a section, subsection, or paragraph.
+            chapter (Optional[str]): The title of the chapter from which the 
+                paragraphs are extracted. Defaults to None.
+            author (Optional[str]): The author of the content. Defaults to None.
+            title (Optional[str]): The title of the content. Defaults to None.
 
-    Returns:
-        List[Dict[str, Any]]: A list of dictionaries, each representing a 
-            paragraph with its text and associated metadata (chapter, author, 
-            title, section, and subsection).
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries, each representing a 
+                paragraph with its text and associated metadata (chapter, author, 
+                title, section, and subsection).
     """
     paragraphs = []
 
@@ -324,28 +327,29 @@ def extract_paragraphs(
         items: List[Dict[str, Any]]
     ) -> None:
         """
-        Traverses the hierarchical structure of sections and subsections to extract 
-        paragraphs along with their associated metadata.
+            Traverses the hierarchical structure of sections and subsections to extract 
+            paragraphs along with their associated metadata.
 
-        This inner function iterates through each item in the provided list of 
-        dictionaries, checking the type of each item. If the item is a paragraph, 
-        it creates a new dictionary containing the paragraph's text and its 
-        associated metadata (chapter, author, title, section, and subsection) 
-        and appends it to the paragraphs list. If the item contains further 
-        content, it recursively calls itself to process that content.
+            This inner function iterates through each item in the provided list of 
+            dictionaries, checking the type of each item. If the item is a paragraph, 
+            it creates a new dictionary containing the paragraph's text and its 
+            associated metadata (chapter, author, title, section, and subsection) 
+            and appends it to the paragraphs list. If the item contains further 
+            content, it recursively calls itself to process that content.
 
-        Args:
-            items (List[Dict[str, Any]]): A list of dictionaries representing 
-                sections, subsections, or paragraphs in the hierarchy.
+            Args:
+                items (List[Dict[str, Any]]): A list of dictionaries representing 
+                    sections, subsections, or paragraphs in the hierarchy.
         """
         for item in items:
             if item['type'] == 'paragraph':
                 new_paragraph = {
                     'type': 'paragraph',
                     'text': item['text'],
+                    'title': title,
                     'chapter': chapter,
                     'author': author,
-                    'title': title,
+                    'publisher': publisher,
                     'section': item.get('section'),
                     'subsection': item.get('subsection')
                 }
@@ -354,7 +358,10 @@ def extract_paragraphs(
                 traverse(item['content'])
 
     traverse(hierarchy)
-    return paragraphs
+
+    filtered_paragraphs = [p for p in paragraphs if num_tokens_from_string(p['text']) >= min_paragraph_tokens]
+
+    return filtered_paragraphs
 
 def safe_write_file(
     content: Any, 
