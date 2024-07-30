@@ -52,19 +52,11 @@ def openai_query(
     logging.info(f"Formatted messages for OpenAI query: {formatted_messages}")
     return handle_openai_response(prompt, system_instructions, formatted_messages)
 
-
-if __name__ == "__main__":
-    # print("Testing OpenAI query...")
-    # system_instructions = "Respond as if you were Ozzy Osbourne."
-    # history_messages = [{"role": "user", "content": "Hello, how are you?"}, {"role": "assistant", "content": "I'm not feeling too good today."}]
-    # print(openai_query(
-    #     "Why is that?", 
-    #     system_instructions=system_instructions, 
-    #     history_messages=history_messages
-    # ))
-    file_path = "./extracted_documents/The_Philosophical_Baby_all_paragraphs.json"
+def process_query(
+    file_path: str, 
+    query: str, 
+) -> Dict[str, Any]:  # Change return type to Dict[str, Any]
     extracted_list = retrieve_file(file_path)
-    query="When makes babies intelligent?"
     similar_chunks = find_similar_chunks(
         query, 
         extracted_list, 
@@ -74,6 +66,10 @@ if __name__ == "__main__":
         max_returned_chunks=15
     )
     print(f"Number of similar chunks: {len(similar_chunks)}")
+    
+    if not similar_chunks:
+        return {"llm_response": "No relevant information found for the given query."}
+
     for chunk in similar_chunks:
         print(f"\n\nText: {chunk['text']}\n\nSimilarity score: {chunk['similarity']}")
         print(chunk.keys())
@@ -85,7 +81,6 @@ if __name__ == "__main__":
     Do not refer to the source material in your text, only in your number citations
     Give a detailed answer.
     """
-
 
     source_template = """
     Book: *{title}*
@@ -103,5 +98,34 @@ if __name__ == "__main__":
         source_template=source_template,
         template_args={"title": "title", "text": "text", "author": "author", "chapter": "chapter", "publisher": "publisher"}
     )
-    print(response['llm_response'])
+    print(f"\n\nprocess_query response: {response['llm_response']}\n\n")
+    return response  # Return the entire response dictionary
+
+def query_data(
+    file_path: str, 
+    history_messages: List[Dict[str, str]], 
+    query: str
+) -> str:
+    system_instructions = """
+    Based on the chat history available to you, please re-write this question to include relevant context.
+    It will be embedded and used in a similarity search to find relevant information.
+    Do not respond to the user, rephrase the question for a search. 
+    The response should be a question. The response should be a single sentence.
+    """
+
+    new_query = openai_query(query, system_instructions=system_instructions, history_messages=history_messages)
+    print(f"\n\nnew_query: {new_query}\n\n")
+    response = process_query(file_path, new_query)
+    print(f"\n\nquery_data response: {response['llm_response']}\n\n")
+    return response['llm_response']
+
+if __name__ == "__main__":
+    file_path = "./extracted_documents/The_Philosophical_Baby_all_paragraphs.json"
+    history_messages = [
+        {"role": "system", "content": "Why are babies so smart?"},
+        {"role": "assistant", "content": "Babies are born with a certain level of intelligence, but it depends on the environment and the individual's upbringing."},
+    ]
+    query = "Can you go into more detail?"
+
+    query_data(file_path, history_messages, query)
 

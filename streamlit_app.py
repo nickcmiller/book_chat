@@ -2,7 +2,9 @@ import streamlit as st
 import time
 import logging
 
-from query_functions import openai_query
+from query_functions import query_data
+
+file_path = "./extracted_documents/The_Philosophical_Baby_all_paragraphs.json"
 
 def display_chat_history(
     chat_history: list[dict]
@@ -28,7 +30,7 @@ def handle_user_input(
     # Simulate assistant response using OpenAI API
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
-        full_response = openai_query(prompt, system_instructions=system_instructions, history_messages=chat_history)  
+        full_response = query_data(file_path, chat_history, prompt)  
         message_placeholder.markdown(full_response)
 
         # Add assistant response to chat history
