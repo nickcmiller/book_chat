@@ -5,7 +5,7 @@ from genai_toolbox.text_prompting.model_calls import openai_text_response
 from genai_toolbox.chunk_and_embed.embedding_functions import create_openai_embedding, find_similar_chunks
 from genai_toolbox.helper_functions.string_helpers import retrieve_file
 from genai_toolbox.chunk_and_embed.llms_with_queries import llm_response_with_query
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Callable
 import logging
 
 def format_messages(
@@ -52,19 +52,30 @@ def openai_query(
     logging.info(f"Formatted messages for OpenAI query: {formatted_messages}")
     return handle_openai_response(prompt, system_instructions, formatted_messages)
 
-def process_query(
-    file_path: str, 
+def retrieve_similar_chunks(
+    file_path: str,
     query: str, 
-) -> Dict[str, Any]:  # Change return type to Dict[str, Any]
+    embedding_function: Callable = create_openai_embedding, 
+    model_choice: str = "text-embedding-3-large", 
+    threshold: float = 0.4, 
+    max_returned_chunks: int = 15
+) -> List[Dict[str, Any]]:
     extracted_list = retrieve_file(file_path)
     similar_chunks = find_similar_chunks(
         query, 
         extracted_list, 
-        embedding_function=create_openai_embedding, 
-        model_choice="text-embedding-3-large", 
-        threshold=0.4, 
-        max_returned_chunks=15
+        embedding_function=embedding_function, 
+        model_choice=model_choice, 
+        threshold=threshold, 
+        max_returned_chunks=max_returned_chunks
     )
+    return similar_chunks
+
+def process_query(
+    file_path: str, 
+    query: str, 
+) -> Dict[str, Any]:  # Change return type to Dict[str, Any]
+    similar_chunks = retrieve_similar_chunks(file_path, query)
     print(f"Number of similar chunks: {len(similar_chunks)}")
     
     if not similar_chunks:
