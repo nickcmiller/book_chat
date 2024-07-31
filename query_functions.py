@@ -77,9 +77,16 @@ def process_query(
     llm_system_prompt_default = f"""
     Use numbered references (e.g. [1]) to cite the sources that are given to you in your answers.
     List the references used at the bottom of your answer.
-    Use MLA Citation Style that references the chapter.
     Do not refer to the source material in your text, only in your number citations
     Give a detailed answer.
+    
+    Example:
+    Text that is referring to the first source.[1] Text that cites sources 2 and 3.[2][3]
+
+    **References:**
+        1. Last Name, First Name. "Chapter Title." *Book Title*, Publisher, Year.
+        2. Rowling, J.K. "The Forbidden Forest." *The Philosophers's Stone.*, Bloomsbury, 2005.
+        3. Rowling, J.K. "Dobby's Warning." *The Chamber of Secrets.*, Bloomsbury, 2005.
     """
 
     source_template = """

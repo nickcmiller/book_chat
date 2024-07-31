@@ -98,11 +98,11 @@ def process_chapter(
         min_paragraph_tokens=15
     )
 
-    save_chapter_files(text, new_hierarchy, paragraphs, output_dir, i, safe_chapter_title)
+    _save_chapter_files(text, new_hierarchy, paragraphs, output_dir, i, safe_chapter_title)
 
     return paragraphs
 
-def save_chapter_files(
+def _save_chapter_files(
     text: str,
     hierarchy: dict,
     paragraphs: List[Dict[str, Any]],
@@ -129,45 +129,21 @@ def save_chapter_files(
         Each file is named using the chapter index and the safe chapter title to ensure uniqueness and avoid file system issues.
     """
 
+    os.makedirs(os.path.join(output_dir, 'text'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'hierarchy'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'paragraphs'), exist_ok=True)
+
     text_filename = f"{i}_{safe_chapter_title}.txt"
-    text_filepath = os.path.join(output_dir, text_filename)
+    text_filepath = os.path.join(output_dir, 'text', text_filename)
     safe_write_file(text, text_filepath, file_type='text')
 
     hierarchy_filename = f'{i+1}_{safe_chapter_title}_hierarchy.json'
-    hierarchy_filepath = os.path.join(output_dir, hierarchy_filename)
+    hierarchy_filepath = os.path.join(output_dir, 'hierarchy', hierarchy_filename)
     safe_write_file(hierarchy, hierarchy_filepath)
 
     paragraphs_filename = f'{i+1}_{safe_chapter_title}_paragraphs.json'
-    paragraphs_filepath = os.path.join(output_dir, paragraphs_filename)
+    paragraphs_filepath = os.path.join(output_dir, 'paragraphs', paragraphs_filename)
     safe_write_file(paragraphs, paragraphs_filepath)
-
-def save_consolidated_paragraphs(
-    all_paragraphs: List[Dict[str, Any]],
-    book_name: str,
-    output_dir: str
-) -> None:
-    """
-        Saves the consolidated paragraphs to a JSON file.
-
-        Parameters:
-        - all_paragraphs (List[Dict[str, Any]]): A list of dictionaries containing the extracted paragraphs.
-        - book_name (str): The name of the book, used to create the output filename.
-        - output_dir (str): The directory where the output file will be saved.
-
-        This function performs the following steps:
-        1. Constructs the filename for the consolidated paragraphs using the book name.
-        2. Joins the output directory and filename to create the full file path.
-        3. Writes the list of paragraphs to a JSON file at the specified path.
-        4. Logs the location of the saved file.
-
-        Returns:
-        - None: This function does not return any value but saves the output to a file.
-    """
-    logging.info(f"Number of paragraphs: {len(all_paragraphs)}")
-    consolidated_filename = f'{book_name}_all_paragraphs.json'
-    consolidated_filepath = os.path.join(output_dir, consolidated_filename)
-    safe_write_file(all_paragraphs, f"{EXTRACTED_DIR}/{book_name}_all_paragraphs.json")
-    logging.info(f"Consolidated paragraphs saved to: {consolidated_filepath}")
 
 def process_book(
     book_path: str
@@ -205,7 +181,8 @@ def process_book(
     6. Sets up an output directory based on the book's title with setup_output_directory.
     6. Iterates through the items in the book, processing each chapter and 
        consolidating the extracted paragraphs.
-    7. Saves the consolidated paragraphs to a JSON file.
+    7. Saves the consolidated paragraphs to a JSON file. The 
+    8. Returns the book name.
 
     Returns:
     - None: This function does not return any value but saves the output to files.
@@ -222,10 +199,10 @@ def process_book(
     logging.info(f"Chapter mapping: {json.dumps(chapter_mapping, indent=2)}")
     logging.info(f"Metadata: {json.dumps(metadata, indent=2)}")
 
+    all_paragraphs = []
+
     book_name = metadata['title'].replace(' ', '_')
     output_dir = setup_output_directory(book_name)
-
-    all_paragraphs = []
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         process_chapter_partial = partial(process_chapter, 
@@ -246,27 +223,107 @@ def process_book(
         model_choice = 'text-embedding-3-large'
     )
 
-    save_consolidated_paragraphs(embedded_paragraphs, book_name, output_dir)
+    book_paragraphs_filepath = _save_consolidated_paragraphs(embedded_paragraphs, book_name, output_dir)
     logging.info(f"Finished processing book: {book_path}")
+
+    return book_paragraphs_filepath
+
+def _save_consolidated_paragraphs(
+    all_paragraphs: List[Dict[str, Any]],
+    book_name: str,
+    output_dir: str
+) -> None:
+    """
+        Saves the consolidated paragraphs to a JSON file.
+
+        Parameters:
+        - all_paragraphs (List[Dict[str, Any]]): A list of dictionaries containing the extracted paragraphs.
+        - book_name (str): The name of the book, used to create the output filename.
+        - output_dir (str): The directory where the output file will be saved.
+
+        This function performs the following steps:
+        1. Constructs the filename for the consolidated paragraphs using the book name.
+        2. Joins the output directory and filename to create the full file path.
+        3. Writes the list of paragraphs to a JSON file at the specified path.
+        4. Logs the location of the saved file.
+
+        Returns:
+        - None: This function does not return any value but saves the output to a file.
+    """
+    logging.info(f"Number of paragraphs: {len(all_paragraphs)}")
+    consolidated_paragraphs_filename = f'{book_name}_all_paragraphs.json'
+    consolidated_paragraphs_filepath = os.path.join(output_dir, consolidated_paragraphs_filename)
+    safe_write_file(all_paragraphs, consolidated_paragraphs_filepath)
+    logging.info(f"Consolidated paragraphs saved to: {consolidated_paragraphs_filepath}")
+
+    return consolidated_paragraphs_filepath
 
 def process_books(
     book_paths: List[str]
-) -> None:
+) -> str:
     """
     Processes a list of book paths by extracting metadata, 
-    processing each book, and saving the consolidated paragraphs.
+    processing each book, saving the consolidated paragraphs,
+    and then combining all consolidated paragraphs into a single file.
+
+    Args:
+        book_paths (List[str]): List of paths to the EPUB files to be processed.
+
+    Returns:
+        str: The filepath of the combined paragraphs file, or None if no paragraphs were found.
     """
+    book_paragraphs_filepaths = []
     for book_path in book_paths:
         try:
-            process_book(book_path)
+            book_paragraphs_filepath = process_book(book_path)
+            if book_paragraphs_filepath:
+                book_paragraphs_filepaths.append(book_paragraphs_filepath)
+                print(f"Book paragraphs filepath: {book_paragraphs_filepath}")
         except Exception as e:
             logging.error(f"Error processing book {book_path}: {str(e)}")
+
+    # After processing all books, combine their consolidated paragraphs
+    return _combine_consolidated_paragraphs(book_paragraphs_filepaths)
+
+def _combine_consolidated_paragraphs(
+    book_paragraphs_filepaths: List[str]
+) -> str:
+    """
+    Combines consolidated paragraph files from multiple books into a single file.
+
+    Args:
+        book_paragraphs_filepaths (List[str]): List of filepaths to the consolidated paragraph files.
+
+    Returns:
+        str: The filepath of the combined paragraphs file.
+
+    This function does the following:
+    1. Iterates through the consolidated paragraph files.
+    2. Reads the paragraphs from each file.
+    3. Combines all paragraphs into a single list.
+    4. Saves the combined list to a new JSON file.
+    """
+    all_paragraphs = []
+    for filepath in book_paragraphs_filepaths:
+        if os.path.exists(filepath):
+            with open(filepath, 'r', encoding='utf-8') as f:
+                book_paragraphs = json.load(f)
+                all_paragraphs.extend(book_paragraphs)
+    
+    if all_paragraphs:
+        combined_file = os.path.join(EXTRACTED_DIR, "all_books_paragraphs.json")
+        safe_write_file(all_paragraphs, combined_file)
+        logging.info(f"Combined paragraphs from all books saved to: {combined_file}")
+        return combined_file
+    else:
+        logging.warning("No paragraphs found to combine.")
+        return None
 
 if __name__ == "__main__":
     book_paths = [
         '../the-philosophical-baby-alison-gopnik-first-edition copy.epub',
         # '../the-code-breaker-jennifer-doudna-gene-editing.epub',
         # '../the-first-tycoon-the-epic-life-of-cornelius copy.epub',
-        # '../Deep Utopia _ Life and Meaning in a Solved World -- Nick Bostrom -- 1, 2024 -- Ideapress Publishing copy.epub'
+        '../Deep Utopia _ Life and Meaning in a Solved World -- Nick Bostrom -- 1, 2024 -- Ideapress Publishing copy.epub'
     ]
     process_books(book_paths)

@@ -4,7 +4,7 @@ import logging
 
 from query_functions import query_data
 
-file_path = "./extracted_documents/The_Philosophical_Baby_all_paragraphs.json"
+file_path = "./extracted_documents/all_books_paragraphs.json"
 
 def display_chat_history(
     chat_history: list[dict]
