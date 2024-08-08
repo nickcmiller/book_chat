@@ -53,8 +53,13 @@ def handle_user_input(
 
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
-        full_response = query_data(file_path, chat_history, prompt)  
-        message_placeholder.markdown(full_response)
+        full_response = query_data(
+                question=prompt,
+                file_path=file_path, 
+                history_messages=chat_history, 
+            )  
+        # Ensure markdown is rendered correctly
+        message_placeholder.markdown(full_response, unsafe_allow_html=True)
 
         chat_history.append({"role": "assistant", "content": full_response})
 

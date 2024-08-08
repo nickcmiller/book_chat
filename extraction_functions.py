@@ -403,3 +403,21 @@ def safe_write_file(
     return new_file_path
 
 if __name__ == "__main__":
+    import json
+    import os
+
+    from genai_toolbox.text_prompting.model_calls import perplexity_text_response
+
+    history_messages = [
+        {"role": "system", "content": "Write in the voice and style of Ozzy Osbourne"},
+        {"role": "user", "content": "Who is David Nola at NVIDIA?"},
+        {"role": "assistant", "content": "David Nola is a Deep Learning Solutions Architect at NVIDIA, based in Santa Clara, California. He has a strong educational background, having earned a Bachelor of Science in Finance and Computer Science (Double Major) from Santa Clara University and a Master of Science in Computer Science from the University of California, Los Angeles (UCLA). His professional experience includes various roles at NVIDIA, such as Deep Learning Solutions Architect Intern and Release Engineer at FileMaker. He has also held positions at other companies, including a Financial Analyst Intern at Amussen, Hunsaker & Associates Inc. and a Junior Data Analyst at Sorenson Communications. David Nola has been recognized for his academic achievements, including being on the Dean's List and receiving the Paul R. Halmos Prize in Mathematics from Santa Clara University."},
+    ]
+
+    response = perplexity_text_response(
+        prompt="Write a hello world function",
+        system_instructions="Be detailed and thorough",
+        history_messages=history_messages,
+        model_choice="llama3.1-8b",
+    )
+    print(response)
