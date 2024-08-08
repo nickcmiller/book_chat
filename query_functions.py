@@ -85,19 +85,46 @@ def process_query(
         print(f"\n\nText: {chunk['text']}\n\nSimilarity score: {chunk['similarity']}")
         print(chunk.keys())
 
+    # llm_system_prompt_default = f"""
+    # Use numbered references (e.g. [1]) to cite the chapters that are given to you in your answers.
+    # List the references used at the bottom of your answer. Only list each chapter once.
+    # Do not refer to the source material in your text, only in your number citations
+    # Give a detailed answer.
+    
+    # Example:
+    # ```
+    # Text that is referring to the first source.[1] Text that cites sources 2 and 3.[2][3]
+    
+    # Text that cites source 1 for a second time.[1]
+
+    # **References:**
+    #     1. Last Name, First Name. "Chapter Title." *Book Title*, Publisher, Year.
+    #     2. Rowling, J.K. "The Forbidden Forest." *The Philosophers's Stone.*, Bloomsbury, 2005.
+    #     3. Rowling, J.K. "Dobby's Warning." *The Chamber of Secrets.*, Bloomsbury, 2005.
+    # ```
+    # Make sure the chapters are included in the references.
+    # If the same chapter is used multiple times, only include it once in the references.
+    # """
+
     llm_system_prompt_default = f"""
-    Use numbered references (e.g. [1]) to cite the sources that are given to you in your answers.
-    List the references used at the bottom of your answer.
+    Use numbered references (e.g. [1]) to cite the chapters that are given to you in your answers.
+    List the references used at the bottom of your answer. Only list each chapter once.
     Do not refer to the source material in your text, only in your number citations
     Give a detailed answer.
     
     Example:
+    ```
     Text that is referring to the first source.[1] Text that cites sources 2 and 3.[2][3]
+    
+    Text that cites source 1 for a second time.[1]
 
     **References:**
-        1. Last Name, First Name. "Chapter Title." *Book Title*, Publisher, Year.
-        2. Rowling, J.K. "The Forbidden Forest." *The Philosophers's Stone.*, Bloomsbury, 2005.
-        3. Rowling, J.K. "Dobby's Warning." *The Chamber of Secrets.*, Bloomsbury, 2005.
+        1. "Chapter Title", *Book Title* by Author Name
+        2. "The Forbidden Forest", *The Philosophers's Stone* by J.K. Rowling
+        3. "Dobby's Warning", *The Chamber of Secrets* by J.K. Rowling
+    ```
+    Make sure the chapters are included in the references.
+    If the same chapter is used multiple times, only include it once in the references.
     """
 
     source_template = """

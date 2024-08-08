@@ -322,8 +322,8 @@ def _combine_consolidated_paragraphs(
 if __name__ == "__main__":
     book_paths = [
         '../the-philosophical-baby-alison-gopnik-first-edition copy.epub',
-        # '../the-code-breaker-jennifer-doudna-gene-editing.epub',
-        # '../the-first-tycoon-the-epic-life-of-cornelius copy.epub',
+        '../the-code-breaker-jennifer-doudna-gene-editing.epub',
+        '../the-first-tycoon-the-epic-life-of-cornelius copy.epub',
         '../Deep Utopia _ Life and Meaning in a Solved World -- Nick Bostrom -- 1, 2024 -- Ideapress Publishing copy.epub'
     ]
     process_books(book_paths)

@@ -403,5 +403,3 @@ def safe_write_file(
     return new_file_path
 
 if __name__ == "__main__":
-    import json
-    import os
