@@ -26,47 +26,32 @@ def handle_user_input(
     prompt: str,
     chat_history: list[dict]
 ) -> None:
-    """
-        Handles user input by processing the prompt and updating the chat history.
-
-        Parameters:
-        - prompt (str): The user's input message to be processed.
-        - chat_history (list[dict]): A list of dictionaries representing the chat history, 
-        where each dictionary contains the role (user or assistant) and the content of the message.
-
-        This function performs the following steps:
-        1. Appends the user's prompt to the chat history.
-        2. Logs the current chat history for debugging purposes.
-        3. Displays the user's message in the chat interface.
-        4. Queries the OpenAI API for a response based on the user's prompt and the chat history.
-        5. Displays the assistant's response in the chat interface.
-        6. Appends the assistant's response to the chat history.
-
-        Returns:
-        - None: This function does not return any value but updates the chat history and the chat interface.
-    """
     chat_history.append({"role": "user", "content": prompt})
-    logging.info(f"Chat history: {chat_history}")
 
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
-        full_response = query_data(
+        full_response = ""
+        
+        for chunk in query_data(
                 question=prompt,
                 file_path=file_path, 
                 history_messages=chat_history, 
-            )  
-        # Ensure markdown is rendered correctly
-        message_placeholder.markdown(full_response, unsafe_allow_html=True)
+            ):
+            full_response += chunk
+            message_placeholder.markdown(full_response + "▌")
 
         chat_history.append({"role": "assistant", "content": full_response})
 
-st.title("Simple Chat")
+        # Clear the message placeholder after the response is complete
+        message_placeholder.markdown(full_response)  # Remove cursor
+
+st.title("Book Chat")
 
 if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+    st.session_state.chat_history = [{"role": "assistant", "content": "How may I help?"}]
 
 display_chat_history(st.session_state.chat_history)
 

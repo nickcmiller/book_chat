@@ -5,7 +5,7 @@ from genai_toolbox.text_prompting.model_calls import openai_text_response, groq_
 from genai_toolbox.chunk_and_embed.embedding_functions import create_openai_embedding, find_similar_chunks
 from genai_toolbox.helper_functions.string_helpers import retrieve_file
 from genai_toolbox.chunk_and_embed.llms_with_queries import llm_response_with_query, stream_response_with_query
-from typing import List, Optional, Dict, Any, Callable
+from typing import List, Optional, Dict, Any, Callable, Generator
 import logging
 
 def format_messages(
@@ -33,8 +33,6 @@ def groq_query(
         history_messages = []
 
     formatted_messages = format_messages(prompt, system_instructions, history_messages)
-    logging.info(f"Formatted messages for Groq query: {formatted_messages}")
-
     try:
         response = groq_text_response(
             prompt, 
@@ -46,6 +44,30 @@ def groq_query(
     except Exception as e:
         logging.error(f"Error: {e}")
         return "Sorry, I don't understand."
+
+def create_vectordb_query(
+    question: str,
+    history_messages: List[Dict[str, str]], 
+) -> str:
+
+    vectordb_prompt = f"""
+        Request: {question}\n\nBased on this request, what request should I make to my vector database?
+        Use prior messages to establish the intent and context of the question. 
+        Include any relevant topics, themes, or individuals mentioned in the chat history. 
+        Significantly lengthen the request and include as many contextual details as possible to enhance the relevance of the query.
+        Only return the request. Don't preface it or provide an introductory message.
+    """
+
+    vectordb_system_instructions = "You expand on questions asked to a vector database containing chunks of transcripts. You add sub-questions and contextual details to make the query more specific and relevant to the chat history."
+
+    vectordb_query = groq_query(
+        prompt=vectordb_prompt, 
+        system_instructions=vectordb_system_instructions, 
+        history_messages=history_messages
+    )
+    logging.info(f"Vectordb query: {vectordb_query}")
+
+    return vectordb_query
 
 def retrieve_similar_chunks(
     file_path: str,
@@ -68,62 +90,57 @@ def retrieve_similar_chunks(
         threshold=threshold, 
         max_returned_chunks=max_returned_chunks
     )
+    logging.info(f"Retrieved {len(similar_chunks)} similar chunks")
+    if not similar_chunks:
+        return []
+
     return similar_chunks
 
-def process_query(
+def revise_query(
+    question: str,
+    history_messages: List[Dict[str, str]], 
+) -> str:
+    revision_prompt = f"""
+        Question: {question}
+        When possible, rewrite the question using <chat history> to identify the intent of the question, the people referenced by the question, and ideas / topics / themes targeted by the question in <chat history>.
+        If the <chat history> does not contain any information about the people, ideas, or topics relevant to the question, then do not make any assumptions.
+        Only return the request. Don't preface it or provide an introductory message.
+    """
+    revision_system_instructions = "You are an assistant that concisely and carefully rewrites questions. The less than (<) and greater than (>) signs are telling you to refer to the chat history. Don't use < or > in your response."
+
+    new_query = groq_query(
+        prompt=revision_prompt, 
+        system_instructions=revision_system_instructions, 
+        history_messages=history_messages
+    )
+    logging.info(f"Revised query: {new_query}")
+    return new_query
+
+def generate_answer(
     file_path: str, 
     query: str, 
-) -> Dict[str, Any]:
-    """
-    Processes a query by retrieving similar chunks from a specified file and generating a response.
-
-    This function takes a file path and a query string as input, retrieves similar chunks of text 
-    from the file using the `retrieve_similar_chunks` function, and then formats a response based 
-    on the retrieved chunks. If no similar chunks are found, it returns a message indicating that 
-    no relevant information was found.
-
-    Args:
-        file_path (str): The path to the file from which to retrieve text chunks.
-        query (str): The query string for which similar text chunks are to be found.
-
-    Returns:
-        Dict[str, Any]: A dictionary containing the LLM response. If similar chunks are found, 
-        the response will be based on the content of those chunks. If no chunks are found, the 
-        response will indicate that no relevant information was found.
-
-    Example:
-        result = process_query("./path/to/file.json", "What is the significance of the Forbidden Forest?")
-        print(result)  # Output will depend on the contents of the file and the query.
-    """
-    similar_chunks = retrieve_similar_chunks(file_path, query)
-    print(f"Number of similar chunks: {len(similar_chunks)}")
-    
-    if not similar_chunks:
-        return {"llm_response": "No relevant information found for the given query."}
-
-    for chunk in similar_chunks:
-        print(f"\n\nText:\n{chunk['text']}\nSimilarity score: {chunk['similarity']}")
-        print(chunk.keys())
+    similar_chunks: List[Dict[str, Any]]
+) -> Generator[str, Any, Any]:
 
     llm_system_prompt = f"""
-    Use numbered references (e.g. [1]) to cite the chapters that are given to you in your answers.
-    List the references used at the bottom of your answer. Only list each chapter once.
-    Do not refer to the source material in your text, only in your number citations
-    
-    Example:
-    ```
-    Text that is referring to the first source.[1] Text that cites sources 2 and 3.[2][3]
-    
-    Text that cites source 1 for a second time.[1]
+        Use numbered references (e.g. [1]) to cite the chapters that are given to you in your answers.
+        List the references only once at the bottom of your answer.
+        If the same chapter is used multiple times, refer to the same number for citations.
+        Do not refer to the source material in your text, only in your number citations
+        
+        Example:
+        ```
+        Text that is referring to the first source.[1] Text that cites sources 2 and 3.[2][3]
+        
+        Text that cites source 1 for a second time.[1]
 
-    **References:**
-        1. "Chapter Title", *Book Title* by Author Name
-        2. "The Forbidden Forest", *The Philosophers's Stone* by J.K. Rowling
-        3. "Dobby's Warning", *The Chamber of Secrets* by J.K. Rowling
-    ```
-    Make sure the chapters are included in the references.
-    If the same chapter is used multiple times, only include it once in the references.
-    Give a detailed answer.
+        **References:**
+            1. "Chapter Title", *Book Title* by Author Name
+            2. "The Forbidden Forest", *The Philosophers's Stone* by J.K. Rowling
+            3. "Dobby's Warning", *The Chamber of Secrets* by J.K. Rowling
+        ```
+        Make sure the chapters are included in the references.
+        Give a detailed answer.
     """
 
     source_template = """
@@ -164,21 +181,12 @@ def query_data(
     file_path: str, 
     history_messages: List[Dict[str, str]], 
 ) -> str:
-    revision_prompt = f"""
-        Question: {question}
-        When possible, rewrite the question using <chat history> to identify the intent of the question, the people referenced by the question, and ideas / topics / themes targeted by the question in <chat history>.
-        If the <chat history> does not contain any information about the people, ideas, or topics relevant to the question, then do not make any assumptions.
-        Only return the request. Don't preface it or provide an introductory message.
-    """
-    revision_system_instructions = "You are an assistant that concisely and carefully rewrites questions. The less than (<) and greater than (>) signs are telling you to refer to the chat history. Don't use < or > in your response."
-
-    new_query = groq_query(
-        prompt=revision_prompt, 
-        system_instructions=revision_system_instructions, 
-        history_messages=history_messages
-    )
-    print(f"\n\nnew_query:\n{new_query}\n\n")
-    return process_query(file_path, new_query)
+    vectordb_query = create_vectordb_query(question, history_messages)
+    similar_chunks = retrieve_similar_chunks(file_path, vectordb_query)
+    # for chunk in similar_chunks:
+    #     print(f"\n\nText:\n{chunk['text']}\nSimilarity score: {chunk['similarity']}")
+    new_query = revise_query(question, history_messages)
+    return generate_answer(file_path, new_query, similar_chunks)
 
 if __name__ == "__main__":
     file_path = "./extracted_documents/all_books_paragraphs.json"
