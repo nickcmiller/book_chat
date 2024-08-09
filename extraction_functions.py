@@ -12,6 +12,7 @@ import json
 from typing import List, Dict, Tuple, Optional, Any
 import logging
 import os
+from urllib.parse import unquote
 
 def extract_metadata(
     book: epub.EpubBook
@@ -99,6 +100,25 @@ def eliminate_fragments(
         if base_file not in chapter_mapping:
             chapter_mapping[base_file] = title
     return chapter_mapping
+
+def decode_chapter_mapping(chapter_mapping):
+    """
+        decode_chapter_mapping(chapter_mapping) takes a dictionary of chapter mappings and decodes the keys.
+
+        Args:
+            chapter_mapping (Dict[str, str]): A dictionary where the keys are file paths (potentially URL-encoded) 
+            and the values are chapter titles.
+
+        Returns:
+            Dict[str, str]: A new dictionary with the decoded file paths as keys and the corresponding chapter titles 
+            as values. The keys are processed using the unquote function from the urllib.parse module to convert 
+            any URL-encoded characters back to their original representation.
+
+        This function is useful for ensuring that file paths are in a human-readable format, especially when dealing 
+        with file names that may contain special characters or spaces that have been encoded for URL compatibility. 
+        This decoding step is crucial for further processing or displaying the chapter titles correctly.
+    """
+    return {unquote(k): v for k, v in chapter_mapping.items()}
 
 def toc_to_text(
     book: epub.EpubBook

@@ -22,10 +22,26 @@ def display_chat_history(
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
+def display_source_info(source: dict) -> None:
+    """
+    Displays the source information in the Streamlit sidebar.
+
+    Parameters:
+    - source (dict): A dictionary containing source information.
+    """
+    st.sidebar.header(source['title'])
+    st.sidebar.write(f"""
+    **Author:**\n {source['author']}\n
+    **Chapter:**\n {source['chapter']}\n
+    **Text:**\n {source['text']}
+    """)
+
 def handle_user_input(
     prompt: str,
     chat_history: list[dict]
 ) -> None:
+
+    st.sidebar.empty() 
     chat_history.append({"role": "user", "content": prompt})
 
     with st.chat_message("user"):
@@ -35,20 +51,28 @@ def handle_user_input(
         message_placeholder = st.empty()
         full_response = ""
         
-        for chunk in query_data(
+        query_answer, similar_chunks = query_data(
                 question=prompt,
                 file_path=file_path, 
                 history_messages=chat_history, 
-            ):
+            )
+        for source in similar_chunks:
+            display_source_info(source)
+            
+        for chunk in query_answer:
             full_response += chunk
             message_placeholder.markdown(full_response + "▌")
-
+        message_placeholder.markdown(full_response)
+        
         chat_history.append({"role": "assistant", "content": full_response})
 
-        # Clear the message placeholder after the response is complete
-        message_placeholder.markdown(full_response)  # Remove cursor
+        
 
-st.title("Book Chat")
+st.set_page_config(
+    page_title="Book Chat",
+    page_icon=":book:",
+    initial_sidebar_state="expanded"
+)
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [{"role": "assistant", "content": "How may I help?"}]

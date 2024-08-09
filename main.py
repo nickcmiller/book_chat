@@ -20,6 +20,7 @@ from extraction_functions import (
     extract_paragraphs, 
     safe_write_file, 
     create_toc_mapping, 
+    decode_chapter_mapping,
     toc_to_text, 
     eliminate_fragments, 
     extract_metadata
@@ -73,6 +74,7 @@ def process_chapter(
         creates a hierarchy of the content, and saves the chapter's text, hierarchy, and paragraphs to files.
         If no mapped chapter title is found, it logs a message and skips processing for that chapter.
     """
+    # print(f"\n\nchapter_mapping: {json.dumps(chapter_mapping, indent=2)}")
     file_name = item.get_name()
     chapter_title = chapter_mapping.get(file_name)
     
@@ -149,55 +151,56 @@ def process_book(
     book_path: str
 ) -> None:
     """
-    Processes a single book by reading its EPUB file, extracting the table of contents, 
-    chapter metadata, and paragraphs, and saving the extracted content to the specified 
-    output directory.
+        Processes a single book by reading its EPUB file, extracting the table of contents, 
+        chapter metadata, and paragraphs, and saving the extracted content to the specified 
+        output directory.
 
-    Parameters:
-    - book_path (str): The path to the EPUB file to be processed.
+        Parameters:
+        - book_path (str): The path to the EPUB file to be processed.
 
-    This function performs the following steps:
-    1. Reads the EPUB file using the `epub` library.
-    2. Maps the table of contents with create_toc_mapping.
-        Creates a mapping of the table of contents (TOC) for the EPUB book. 
-        This function extracts navigation points from the EPUB's NCX file and 
-        returns a dictionary that maps content source paths to their corresponding 
-        chapter titles. If no navigation item is found, it returns None.
-    3. Eliminates fragments from the TOC mapping with eliminate_fragments.
-        Combines the TOC mapping with a filtered version that eliminates fragments 
-        (incomplete chapters indicated by a '#' in the file path). This results in 
-        a clean mapping of complete chapters to their titles, ensuring that only 
-        valid chapters are processed.
-    4. Converts the TOC mapping to text version of the chapter with toc_to_text.
-        Converts the TOC of the EPUB book into a formatted text representation. 
-        This includes the book's title and author, along with a structured list 
-        of chapters and sub-chapters, making it easier to understand the book's 
-        organization.
-    5. Extracts metadata from the book with extract_metadata.
-        Extracts metadata from the EPUB book, including the title, creator, 
-        language, identifier, publisher, and date. This information is crucial 
-        for understanding the book's context and is used for naming output files 
-        and organizing the extracted content.
-    6. Sets up an output directory based on the book's title with setup_output_directory.
-    6. Iterates through the items in the book, processing each chapter and 
-       consolidating the extracted paragraphs.
-    7. Saves the consolidated paragraphs to a JSON file. The 
-    8. Returns the book name.
+        This function performs the following steps:
+        1. Reads the EPUB file using the `epub` library.
+        2. Maps the table of contents with create_toc_mapping.
+            Creates a mapping of the table of contents (TOC) for the EPUB book. 
+            This function extracts navigation points from the EPUB's NCX file and 
+            returns a dictionary that maps content source paths to their corresponding 
+            chapter titles. If no navigation item is found, it returns None.
+        3. Eliminates fragments from the TOC mapping with eliminate_fragments.
+            Combines the TOC mapping with a filtered version that eliminates fragments 
+            (incomplete chapters indicated by a '#' in the file path). This results in 
+            a clean mapping of complete chapters to their titles, ensuring that only 
+            valid chapters are processed.
+        4. Converts the TOC mapping to text version of the chapter with toc_to_text.
+            Converts the TOC of the EPUB book into a formatted text representation. 
+            This includes the book's title and author, along with a structured list 
+            of chapters and sub-chapters, making it easier to understand the book's 
+            organization.
+        5. Extracts metadata from the book with extract_metadata.
+            Extracts metadata from the EPUB book, including the title, creator, 
+            language, identifier, publisher, and date. This information is crucial 
+            for understanding the book's context and is used for naming output files 
+            and organizing the extracted content.
+        6. Sets up an output directory based on the book's title with setup_output_directory.
+        6. Iterates through the items in the book, processing each chapter and 
+        consolidating the extracted paragraphs.
+        7. Saves the consolidated paragraphs to a JSON file. The 
+        8. Returns the book name.
 
-    Returns:
-    - None: This function does not return any value but saves the output to files.
+        Returns:
+        - None: This function does not return any value but saves the output to files.
     """
     logging.info(f"Processing book: {book_path}")
     book = epub.read_epub(book_path)
     
     toc_mapping = create_toc_mapping(book)
     chapter_mapping = {**toc_mapping, **eliminate_fragments(toc_mapping)}
+    decoded_chapter_mapping = decode_chapter_mapping(chapter_mapping)
     toc_text = toc_to_text(book)
     metadata = extract_metadata(book)
 
     logging.info(f"TOC text: {toc_text}")
-    logging.info(f"Chapter mapping: {json.dumps(chapter_mapping, indent=2)}")
-    logging.info(f"Metadata: {json.dumps(metadata, indent=2)}")
+    logging.info(f"Decoded chapter mapping: {json.dumps(decoded_chapter_mapping, indent=2)}")
+    # logging.info(f"Metadata: {json.dumps(metadata, indent=2)}")
 
     all_paragraphs = []
 
@@ -205,13 +208,17 @@ def process_book(
     output_dir = setup_output_directory(book_name)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        process_chapter_partial = partial(process_chapter, 
-                                          chapter_mapping=chapter_mapping, 
-                                          metadata=metadata, 
-                                          output_dir=output_dir)
-        future_to_item = {executor.submit(process_chapter_partial, item=item, i=i): i 
-                          for i, item in enumerate(book.get_items()) 
-                          if item.get_type() == ebooklib.ITEM_DOCUMENT}
+        process_chapter_partial = partial(
+            process_chapter, 
+            chapter_mapping=decoded_chapter_mapping, 
+            metadata=metadata, 
+            output_dir=output_dir
+        )
+        future_to_item = {
+            executor.submit(process_chapter_partial, item=item, i=i): i 
+            for i, item in enumerate(book.get_items()) 
+            if item.get_type() == ebooklib.ITEM_DOCUMENT
+        }
         
         for future in concurrent.futures.as_completed(future_to_item):
             paragraphs = future.result()
@@ -305,10 +312,13 @@ def _combine_consolidated_paragraphs(
     """
     all_paragraphs = []
     for filepath in book_paragraphs_filepaths:
+        print(f"Filepath: {filepath}")
         if os.path.exists(filepath):
             with open(filepath, 'r', encoding='utf-8') as f:
                 book_paragraphs = json.load(f)
+                print(f"Length of book paragraphs: {len(book_paragraphs)}")
                 all_paragraphs.extend(book_paragraphs)
+                print(f"Length of all paragraphs: {len(all_paragraphs)}")
     
     if all_paragraphs:
         combined_file = os.path.join(EXTRACTED_DIR, "all_books_paragraphs.json")
@@ -321,9 +331,17 @@ def _combine_consolidated_paragraphs(
 
 if __name__ == "__main__":
     book_paths = [
-        '../the-philosophical-baby-alison-gopnik-first-edition copy.epub',
+        # '../the-philosophical-baby-alison-gopnik-first-edition copy.epub',
         '../the-code-breaker-jennifer-doudna-gene-editing.epub',
-        '../the-first-tycoon-the-epic-life-of-cornelius copy.epub',
-        '../Deep Utopia _ Life and Meaning in a Solved World -- Nick Bostrom -- 1, 2024 -- Ideapress Publishing copy.epub'
+        # '../the-first-tycoon-the-epic-life-of-cornelius copy.epub',
+        # '../Deep Utopia _ Life and Meaning in a Solved World -- Nick Bostrom -- 1, 2024 -- Ideapress Publishing copy.epub',
+        '../The Structure of Scientific Revolutions_ 50th Anniversary -- Thomas S. Kuhn -- 50th Anniversary Edition, 2012 copy.epub'
     ]
-    process_books(book_paths)
+   
+    # process_books(book_paths)
+
+    book_filepaths = [
+        'extracted_documents/The_Code_Breaker/The_Code_Breaker_all_paragraphs.json',
+        'extracted_documents/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition_all_paragraphs.json'
+    ]
+    _combine_consolidated_paragraphs(book_filepaths)

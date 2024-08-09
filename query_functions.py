@@ -78,7 +78,7 @@ def retrieve_similar_chunks(
     query: str, 
     embedding_function: Callable = create_openai_embedding, 
     model_choice: str = "text-embedding-3-large", 
-    similarity_threshold: float = 0.3, 
+    similarity_threshold: float = 0.35, 
     filter_limit: int = 10,
     max_similarity_delta: float = 0.075
 ) -> List[Dict[str, Any]]:
@@ -128,11 +128,36 @@ def revise_query(
     return new_query
 
 def generate_answer(
-    file_path: str, 
-    query: str, 
-    similar_chunks: List[Dict[str, Any]]
+    query: str,
+    history_messages: List[Dict[str, str]],
+    similar_chunks: List[Dict[str, Any]],
 ) -> Generator[str, Any, Any]:
+    """
+        Generates an answer based on the provided query, chat history, and similar chunks of text.
 
+        Parameters:
+        - query (str): The user's question or prompt that needs to be answered.
+        - history_messages (List[Dict[str, str]]): A list of messages representing the chat history, 
+        where each message is a dictionary containing the role (user or assistant) and the content.
+        - similar_chunks (List[Dict[str, Any]]): A list of chunks of text that are similar to the query, 
+        which will be used to formulate the answer.
+
+        Returns:
+        - Generator[str, Any, Any]: A generator that yields the generated answer as a string. 
+        The answer will include citations to the sources used, formatted according to the specified 
+        citation style in the system prompt.
+
+        The function first constructs a system prompt that instructs the language model to use numbered 
+        references for citing chapters from the provided sources. It then prepares the chat history 
+        for the model by taking the last few messages and inserting the system prompt at the beginning.
+
+        A source template is defined to format the information about each source, including the title, 
+        chapter, author, and publisher. Finally, the function calls `stream_response_with_query` to 
+        generate the answer, passing in the necessary parameters, including the query, chat history, 
+        source template, and model configuration.
+
+        If no similar chunks are found, the function will inform the user that no sources were found.
+    """
     llm_system_prompt = f"""
         Use numbered references (e.g. [1]) to cite the chapters that are given to you in your answers.
         List the references only once at the bottom of your answer.
@@ -154,6 +179,9 @@ def generate_answer(
         If there are no sources, then tell me 'No sources found'.
     """
 
+    revised_history_messages = history_messages[-5:-1]
+    revised_history_messages.insert(0, {"role": "system", "content": llm_system_prompt})
+
     source_template = """
     Book: *{title}*
     Chapter: {chapter}
@@ -166,7 +194,7 @@ def generate_answer(
     return stream_response_with_query(
         similar_chunks,
         question=query,
-        llm_system_prompt=llm_system_prompt,
+        history_messages=revised_history_messages,
         source_template=source_template,
         template_args={
             "title": "title", 
@@ -176,6 +204,10 @@ def generate_answer(
             "publisher": "publisher"
         },
         llm_model_order=[
+            {
+                "provider": "openai", 
+                "model": "4o-mini"
+            },
             {
                 "provider": "openai", 
                 "model": "4o"
@@ -208,11 +240,11 @@ def query_data(
     logging.info(f"\nSimilar chunk retrieval duration: {similar_chunks_end_time - vectordb_end_time} seconds\n")
 
     new_query = revise_query(question, history_messages)
-    
+
     new_query_end_time = time.time()
     logging.info(f"\nNew query duration: {new_query_end_time - similar_chunks_end_time} seconds\n")
 
-    return generate_answer(file_path, new_query, similar_chunks)
+    return generate_answer(new_query, history_messages, similar_chunks), similar_chunks
 
 if __name__ == "__main__":
     file_path = "./extracted_documents/all_books_paragraphs.json"
