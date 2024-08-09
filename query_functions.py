@@ -5,8 +5,10 @@ from genai_toolbox.text_prompting.model_calls import openai_text_response, groq_
 from genai_toolbox.chunk_and_embed.embedding_functions import create_openai_embedding, find_similar_chunks
 from genai_toolbox.helper_functions.string_helpers import retrieve_file
 from genai_toolbox.chunk_and_embed.llms_with_queries import llm_response_with_query, stream_response_with_query
+
 from typing import List, Optional, Dict, Any, Callable, Generator
 import logging
+import time
 
 def format_messages(
     prompt: str, 
@@ -24,7 +26,8 @@ def format_messages(
 def groq_query(
     prompt: str, 
     system_instructions: str = None, 
-    history_messages: List[Dict[str, Any]] = None
+    history_messages: List[Dict[str, Any]] = None,
+    model_choice: str = "llama3.1-70b"
 ) -> str:
     """
     Query the Groq API for a response based on the provided prompt and history.
@@ -38,7 +41,7 @@ def groq_query(
             prompt, 
             system_instructions, 
             formatted_messages,
-            model_choice="llama3.1-70b"
+            model_choice=model_choice
         )
         return response
     except Exception as e:
@@ -53,7 +56,7 @@ def create_vectordb_query(
     vectordb_prompt = f"""
         Request: {question}\n\nBased on this request, what request should I make to my vector database?
         Use prior messages to establish the intent and context of the question. 
-        Include any relevant topics, themes, or individuals mentioned in the chat history. 
+        If any relevant topics, themes, or individuals mentioned in chat history, incorporate them in the request.
         Significantly lengthen the request and include as many contextual details as possible to enhance the relevance of the query.
         Only return the request. Don't preface it or provide an introductory message.
     """
@@ -65,6 +68,7 @@ def create_vectordb_query(
         system_instructions=vectordb_system_instructions, 
         history_messages=history_messages
     )
+
     logging.info(f"Vectordb query: {vectordb_query}")
 
     return vectordb_query
@@ -74,8 +78,9 @@ def retrieve_similar_chunks(
     query: str, 
     embedding_function: Callable = create_openai_embedding, 
     model_choice: str = "text-embedding-3-large", 
-    threshold: float = 0.4, 
-    max_returned_chunks: int = 15
+    similarity_threshold: float = 0.3, 
+    filter_limit: int = 10,
+    max_similarity_delta: float = 0.075
 ) -> List[Dict[str, Any]]:
     extracted_list = retrieve_file(file_path)
     if not extracted_list:
@@ -87,11 +92,15 @@ def retrieve_similar_chunks(
         extracted_list, 
         embedding_function=embedding_function, 
         model_choice=model_choice, 
-        threshold=threshold, 
-        max_returned_chunks=max_returned_chunks
+        similarity_threshold=similarity_threshold,
+        filter_limit=filter_limit,
+        max_similarity_delta=max_similarity_delta
     )
+
     logging.info(f"Retrieved {len(similar_chunks)} similar chunks")
+
     if not similar_chunks:
+        logging.warning(f"No similar rows found for the query embedding.")
         return []
 
     return similar_chunks
@@ -109,11 +118,13 @@ def revise_query(
     revision_system_instructions = "You are an assistant that concisely and carefully rewrites questions. The less than (<) and greater than (>) signs are telling you to refer to the chat history. Don't use < or > in your response."
 
     new_query = groq_query(
-        prompt=revision_prompt, 
+        prompt=revision_prompt,
         system_instructions=revision_system_instructions, 
         history_messages=history_messages
     )
+
     logging.info(f"Revised query: {new_query}")
+
     return new_query
 
 def generate_answer(
@@ -139,8 +150,8 @@ def generate_answer(
             2. "The Forbidden Forest", *The Philosophers's Stone* by J.K. Rowling
             3. "Dobby's Warning", *The Chamber of Secrets* by J.K. Rowling
         ```
-        Make sure the chapters are included in the references.
         Give a detailed answer.
+        If there are no sources, then tell me 'No sources found'.
     """
 
     source_template = """
@@ -166,6 +177,10 @@ def generate_answer(
         },
         llm_model_order=[
             {
+                "provider": "openai", 
+                "model": "4o"
+            },
+            {
                 "provider": "groq", 
                 "model": "llama3.1-70b"
             },
@@ -181,11 +196,22 @@ def query_data(
     file_path: str, 
     history_messages: List[Dict[str, str]], 
 ) -> str:
+    start_time = time.time()
+    
     vectordb_query = create_vectordb_query(question, history_messages)
+    vectordb_end_time = time.time()
+    logging.info(f"\nVectordb duration: {vectordb_end_time - start_time} seconds\n")
+
     similar_chunks = retrieve_similar_chunks(file_path, vectordb_query)
-    # for chunk in similar_chunks:
-    #     print(f"\n\nText:\n{chunk['text']}\nSimilarity score: {chunk['similarity']}")
+    
+    similar_chunks_end_time = time.time()
+    logging.info(f"\nSimilar chunk retrieval duration: {similar_chunks_end_time - vectordb_end_time} seconds\n")
+
     new_query = revise_query(question, history_messages)
+    
+    new_query_end_time = time.time()
+    logging.info(f"\nNew query duration: {new_query_end_time - similar_chunks_end_time} seconds\n")
+
     return generate_answer(file_path, new_query, similar_chunks)
 
 if __name__ == "__main__":

@@ -91,7 +91,7 @@ def process_chapter(
     new_hierarchy = add_hierarchy_keys(hierarchy)
     paragraphs = extract_paragraphs(
         hierarchy=new_hierarchy, 
-        chapter=safe_chapter_title, 
+        chapter=chapter_title, 
         author=metadata['creator'], 
         title=metadata['title'],
         publisher=metadata['publisher'],
