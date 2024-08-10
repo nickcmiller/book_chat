@@ -228,6 +228,43 @@ def query_data(
     file_path: str, 
     history_messages: List[Dict[str, str]], 
 ) -> str:
+    """
+        Queries the data based on the provided question and history messages.
+
+        This function serves as the main entry point for querying the vector database and retrieving relevant 
+        information based on the user's question. It performs the following steps:
+
+        1. **History Message Preparation**: It takes the last few messages from the chat history and 
+        prepends a system message to provide context for the query.
+
+        2. **Vector Database Query Creation**: It constructs a query specifically tailored for the vector 
+        database using the provided question and the prepared history messages. This helps in understanding 
+        the context and intent behind the user's question.
+
+        3. **Retrieving Similar Chunks**: The function then calls another function to retrieve similar chunks 
+        of text from the specified file based on the generated vector database query. This step is crucial 
+        for finding relevant information that can help answer the user's question.
+
+        4. **Query Revision**: After retrieving similar chunks, it revises the original question to enhance 
+        its clarity and relevance based on the chat history. This ensures that the query is as effective as 
+        possible in eliciting a useful response.
+
+        5. **Generating the Answer**: Finally, it generates an answer using the revised query, the history 
+        messages, and the similar chunks retrieved. The function returns both the generated answer and the 
+        list of similar chunks for further processing or display.
+
+        Parameters:
+        - question (str): The question to be asked.
+        - file_path (str): The path to the file containing the data.
+        - history_messages (List[Dict[str, str]]): A list of dictionaries representing the chat history, 
+        where each dictionary contains the role (user or assistant) and the content of the message.
+
+        Returns:
+        - Tuple[str, List[Dict[str, str]]]: A tuple containing the generated answer as a string and 
+        a list of similar chunks retrieved from the data source.
+    """
+
+
     start_time = time.time()
     
     vectordb_query = create_vectordb_query(question, history_messages)
