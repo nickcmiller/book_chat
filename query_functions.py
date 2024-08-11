@@ -110,10 +110,14 @@ def revise_query(
     history_messages: List[Dict[str, str]], 
 ) -> str:
     revision_prompt = f"""
-        Question: {question}
         When possible, rewrite the question using <chat history> to identify the intent of the question, the people referenced by the question, and ideas / topics / themes targeted by the question in <chat history>.
         If the <chat history> does not contain any information about the people, ideas, or topics relevant to the question, then do not make any assumptions.
+        The rewrite should be concise and direct. It should end with a ? mark.
         Only return the request. Don't preface it or provide an introductory message.
+
+        ---
+        Question: {question}
+        ---
     """
     revision_system_instructions = "You are an assistant that concisely and carefully rewrites questions. The less than (<) and greater than (>) signs are telling you to refer to the chat history. Don't use < or > in your response."
 
