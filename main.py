@@ -227,7 +227,8 @@ def process_book(
     embedded_paragraphs = embed_dict_list(
         embedding_function=create_openai_embedding,
         chunk_dicts=all_paragraphs,
-        model_choice = 'text-embedding-3-large'
+        model_choice = 'text-embedding-3-large',
+        metadata_keys=[ 'chapter', 'title', 'author']
     )
 
     book_paragraphs_filepath = _save_consolidated_paragraphs(embedded_paragraphs, book_name, output_dir)
@@ -269,15 +270,15 @@ def process_books(
     book_paths: List[str]
 ) -> str:
     """
-    Processes a list of book paths by extracting metadata, 
-    processing each book, saving the consolidated paragraphs,
-    and then combining all consolidated paragraphs into a single file.
+        Processes a list of book paths by extracting metadata, 
+        processing each book, saving the consolidated paragraphs,
+        and then combining all consolidated paragraphs into a single file.
 
-    Args:
-        book_paths (List[str]): List of paths to the EPUB files to be processed.
+        Args:
+            book_paths (List[str]): List of paths to the EPUB files to be processed.
 
-    Returns:
-        str: The filepath of the combined paragraphs file, or None if no paragraphs were found.
+        Returns:
+            str: The filepath of the combined paragraphs file, or None if no paragraphs were found.
     """
     book_paragraphs_filepaths = []
     for book_path in book_paths:
@@ -296,19 +297,19 @@ def _combine_consolidated_paragraphs(
     book_paragraphs_filepaths: List[str]
 ) -> str:
     """
-    Combines consolidated paragraph files from multiple books into a single file.
+        Combines consolidated paragraph files from multiple books into a single file.
 
-    Args:
-        book_paragraphs_filepaths (List[str]): List of filepaths to the consolidated paragraph files.
+        Args:
+            book_paragraphs_filepaths (List[str]): List of filepaths to the consolidated paragraph files.
 
-    Returns:
-        str: The filepath of the combined paragraphs file.
+        Returns:
+            str: The filepath of the combined paragraphs file.
 
-    This function does the following:
-    1. Iterates through the consolidated paragraph files.
-    2. Reads the paragraphs from each file.
-    3. Combines all paragraphs into a single list.
-    4. Saves the combined list to a new JSON file.
+        This function does the following:
+        1. Iterates through the consolidated paragraph files.
+        2. Reads the paragraphs from each file.
+        3. Combines all paragraphs into a single list.
+        4. Saves the combined list to a new JSON file.
     """
     all_paragraphs = []
     for filepath in book_paragraphs_filepaths:
@@ -332,16 +333,17 @@ def _combine_consolidated_paragraphs(
 if __name__ == "__main__":
     book_paths = [
         # '../the-philosophical-baby-alison-gopnik-first-edition copy.epub',
-        '../the-code-breaker-jennifer-doudna-gene-editing.epub',
+        # '../the-code-breaker-jennifer-doudna-gene-editing.epub',
         # '../the-first-tycoon-the-epic-life-of-cornelius copy.epub',
         # '../Deep Utopia _ Life and Meaning in a Solved World -- Nick Bostrom -- 1, 2024 -- Ideapress Publishing copy.epub',
-        '../The Structure of Scientific Revolutions_ 50th Anniversary -- Thomas S. Kuhn -- 50th Anniversary Edition, 2012 copy.epub'
+        # '../The Structure of Scientific Revolutions_ 50th Anniversary -- Thomas S. Kuhn -- 50th Anniversary Edition, 2012 copy.epub'
+        '../The Singularity Is Nearer _ When We Merge with AI -- Ray Kurzweil -- 2024 -- Penguin Publishing Group -- 0593489411 copy.epub'
     ]
    
-    # process_books(book_paths)
+    process_books(book_paths)
 
-    book_filepaths = [
-        'extracted_documents/The_Code_Breaker/The_Code_Breaker_all_paragraphs.json',
-        'extracted_documents/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition_all_paragraphs.json'
-    ]
-    _combine_consolidated_paragraphs(book_filepaths)
+    # book_filepaths = [
+    #     'extracted_documents/The_Code_Breaker/The_Code_Breaker_all_paragraphs.json',
+    #     'extracted_documents/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition_all_paragraphs.json'
+    # ]
+    # _combine_consolidated_paragraphs(book_filepaths)

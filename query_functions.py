@@ -76,11 +76,11 @@ def create_vectordb_query(
 def retrieve_similar_chunks(
     file_path: str,
     query: str, 
+    similarity_threshold: float,
+    filter_limit: int,
+    max_similarity_delta: float,
     embedding_function: Callable = create_openai_embedding, 
-    model_choice: str = "text-embedding-3-large", 
-    similarity_threshold: float = 0.35, 
-    filter_limit: int = 10,
-    max_similarity_delta: float = 0.075
+    model_choice: str = "text-embedding-3-large"
 ) -> List[Dict[str, Any]]:
     extracted_list = retrieve_file(file_path)
     if not extracted_list:
@@ -113,6 +113,7 @@ def revise_query(
         When possible, rewrite the question using <chat history> to identify the intent of the question, the people referenced by the question, and ideas / topics / themes targeted by the question in <chat history>.
         If the <chat history> does not contain any information about the people, ideas, or topics relevant to the question, then do not make any assumptions.
         The rewrite should be concise and direct. It should end with a ? mark.
+        If the user requests a format or style, include that requested format or style in the rewrite.
         Only return the request. Don't preface it or provide an introductory message.
 
         ---
@@ -231,6 +232,9 @@ def query_data(
     question: str,
     file_path: str, 
     history_messages: List[Dict[str, str]], 
+    similarity_threshold: float = 0.4,
+    filter_limit: int = 15,
+    max_similarity_delta: float = 0.075,
 ) -> str:
     """
         Queries the data based on the provided question and history messages.
@@ -268,14 +272,19 @@ def query_data(
         a list of similar chunks retrieved from the data source.
     """
 
-
     start_time = time.time()
     
     vectordb_query = create_vectordb_query(question, history_messages)
     vectordb_end_time = time.time()
     logging.info(f"\nVectordb duration: {vectordb_end_time - start_time} seconds\n")
 
-    similar_chunks = retrieve_similar_chunks(file_path, vectordb_query)
+    similar_chunks = retrieve_similar_chunks(
+        file_path, 
+        vectordb_query, 
+        similarity_threshold=similarity_threshold,
+        filter_limit=filter_limit,
+        max_similarity_delta=max_similarity_delta,
+    )
     
     similar_chunks_end_time = time.time()
     logging.info(f"\nSimilar chunk retrieval duration: {similar_chunks_end_time - vectordb_end_time} seconds\n")
