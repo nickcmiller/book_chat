@@ -30,10 +30,12 @@ def display_source_info(source: dict) -> None:
     - source (dict): A dictionary containing source information.
     """
     st.sidebar.header(source['title'])
-    st.sidebar.write(f"""
-    **Author:**\n {source['author']}\n
-    **Chapter:**\n {source['chapter']}\n
-    **Text:**\n {source['text']}
+    st.sidebar.markdown(f"""
+    **Author:** {source['author']}
+
+    **Chapter:** {source['chapter']}
+
+    **Text:** {source['text']}
     """)
 
 def handle_user_input(

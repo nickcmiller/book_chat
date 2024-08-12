@@ -25,6 +25,7 @@ from extraction_functions import (
     eliminate_fragments, 
     extract_metadata
 )
+from summarize_text import summarize_chapter
 from genai_toolbox.chunk_and_embed.embedding_functions import (
     create_openai_embedding, 
     embed_dict_list
@@ -88,6 +89,7 @@ def process_chapter(
     soup = BeautifulSoup(item.get_content(), 'html.parser')
 
     text = extract_text_with_structure(soup.body)
+    summary = summarize_chapter(text, chapter_title, metadata)
     content = extract_content(soup)
     hierarchy = create_hierarchy(content)
     new_hierarchy = add_hierarchy_keys(hierarchy)
@@ -99,13 +101,17 @@ def process_chapter(
         publisher=metadata['publisher'],
         min_paragraph_tokens=15
     )
+    paragraphs.append(summary)
+    
+    summary_text = summary['text'] if summary is not None and summary['text'] != '' else None
 
-    _save_chapter_files(text, new_hierarchy, paragraphs, output_dir, i, safe_chapter_title)
+    _save_chapter_files(text, summary_text, new_hierarchy, paragraphs, output_dir, i, safe_chapter_title)
 
     return paragraphs
-
+    
 def _save_chapter_files(
     text: str,
+    summary_text: str,
     hierarchy: dict,
     paragraphs: List[Dict[str, Any]],
     output_dir: str,
@@ -132,12 +138,19 @@ def _save_chapter_files(
     """
 
     os.makedirs(os.path.join(output_dir, 'text'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, 'summaries'), exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'hierarchy'), exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'paragraphs'), exist_ok=True)
+
 
     text_filename = f"{i}_{safe_chapter_title}.txt"
     text_filepath = os.path.join(output_dir, 'text', text_filename)
     safe_write_file(text, text_filepath, file_type='text')
+
+    if summary_text:
+        summary_filename = f"{i}_{safe_chapter_title}_summary.json"
+        summary_filepath = os.path.join(output_dir, 'summaries', summary_filename)
+        safe_write_file(summary_text, summary_filepath)
 
     hierarchy_filename = f'{i+1}_{safe_chapter_title}_hierarchy.json'
     hierarchy_filepath = os.path.join(output_dir, 'hierarchy', hierarchy_filename)
@@ -347,3 +360,6 @@ if __name__ == "__main__":
     #     'extracted_documents/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition_all_paragraphs.json'
     # ]
     # _combine_consolidated_paragraphs(book_filepaths)
+
+
+     
