@@ -164,9 +164,8 @@ def generate_answer(
         If no similar chunks are found, the function will inform the user that no sources were found.
     """
     llm_system_prompt = f"""
-        Use numbered references (e.g. [1]) to cite the chapters that are given to you in your answers.
-        List the references only once at the bottom of your answer.
-        If the same chapter is used multiple times, refer to the same number for citations.
+        Use numbered references (e.g. [1]) to cite the chapters that are given to you.
+        If the same source is used multiple times, refer to the same number for citations.
         Do not refer to the source material in your text, only in your number citations
         
         Example:
@@ -174,18 +173,13 @@ def generate_answer(
         Text that is referring to the first source.[1] Text that cites sources 2 and 3.[2][3]
         
         Text that cites source 1 for a second time.[1]
-
-        **References:**
-            1. "Chapter Title", *Book Title* by Author Name
-            2. "The Forbidden Forest", *The Philosophers's Stone* by J.K. Rowling
-            3. "Dobby's Warning", *The Chamber of Secrets* by J.K. Rowling
         ```
+
         Give a detailed answer.
         If there are no sources, then tell me 'No sources found'.
     """
 
     revised_history_messages = history_messages[-4:]
-    print(revised_history_messages)
     revised_history_messages.insert(0, {"role": "system", "content": llm_system_prompt})
 
     source_template = """

@@ -350,16 +350,19 @@ if __name__ == "__main__":
         # '../the-first-tycoon-the-epic-life-of-cornelius copy.epub',
         # '../Deep Utopia _ Life and Meaning in a Solved World -- Nick Bostrom -- 1, 2024 -- Ideapress Publishing copy.epub',
         # '../The Structure of Scientific Revolutions_ 50th Anniversary -- Thomas S. Kuhn -- 50th Anniversary Edition, 2012 copy.epub'
-        '../The Singularity Is Nearer _ When We Merge with AI -- Ray Kurzweil -- 2024 -- Penguin Publishing Group -- 0593489411 copy.epub'
+        # '../The Singularity Is Nearer _ When We Merge with AI -- Ray Kurzweil -- 2024 -- Penguin Publishing Group -- 0593489411 copy.epub',
+        '../Reality+ Virtual Worlds and the Problems of Philosophy -- David J. Chalmers -- 2021 -- W. W. Norton & Company copy.epub'
     ]
    
-    process_books(book_paths)
+    # process_books(book_paths)
 
-    # book_filepaths = [
-    #     'extracted_documents/The_Code_Breaker/The_Code_Breaker_all_paragraphs.json',
-    #     'extracted_documents/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition_all_paragraphs.json'
-    # ]
-    # _combine_consolidated_paragraphs(book_filepaths)
+    book_filepaths = [
+        # 'extracted_documents/The_Code_Breaker/The_Code_Breaker_all_paragraphs.json',
+        # 'extracted_documents/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition/The_Structure_of_Scientific_Revolutions:_50th_Anniversary_Edition_all_paragraphs.json',
+        'extracted_documents/Reality+/Reality+_all_paragraphs.json',
+        'extracted_documents/The_Singularity_Is_Nearer/The_Singularity_Is_Nearer_all_paragraphs.json'
+    ]
+    _combine_consolidated_paragraphs(book_filepaths)
 
 
      

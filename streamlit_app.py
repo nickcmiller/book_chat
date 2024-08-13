@@ -4,8 +4,6 @@ import time
 
 from query_functions import search_vector_db, query_data
 
-
-
 def display_chat_history(
     chat_history: list[dict]
 ) -> None:
@@ -24,68 +22,80 @@ def display_chat_history(
             st.markdown(message["content"])
 
 def display_source_info(
-    source: dict
+    source: dict,
+    not_summary: bool = True,
+    index: int = None
 ) -> None:
     """
     Displays the source information in the Streamlit sidebar.
 
     Parameters:
     - source (dict): A dictionary containing source information.
+    - summary (bool): A boolean indicating whether the source is a summary or not.
     """
-    st.sidebar.header(source['title'])
 
     top_text = f"""
     **Author:** {source['author']}
 
     **Chapter:** {source['chapter']}
 
-    **Text:**\n
     """
-    st.sidebar.markdown(top_text)
-    with st.sidebar.expander("View Source Text"):
-        st.sidebar.markdown(source['text'])
+    if not_summary:
+        top_text += f"**Text:**\n"
+    else:
+        top_text += f"**AI Generated Summary:**\n"
+
+    with st.sidebar:
+        st.header(f"{index + 1}: {source['title']}")
+        st.markdown(top_text)
+        with st.expander(label="Expand Text", expanded=not_summary):
+            st.markdown(source['text'])
 
 def handle_user_input(
     prompt: str,
     chat_history: list[dict],
     file_path: str
 ) -> None:
-
     st.sidebar.empty() 
+    st.sidebar.title("References")
    
-
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-        full_response = ""
-
+    with st.spinner("Searching for sources..."):
         similar_chunks = search_vector_db(
             question=prompt,
             file_path=file_path,
             history_messages=chat_history,
         )
 
-        for source in similar_chunks:
-            time.sleep(0.1)  # Pause for 100 milliseconds
-            display_source_info(source)
-        
-        query_answer = query_data(
-                question=prompt,
-                similar_chunks=similar_chunks,
-                history_messages=chat_history, 
-        )
+        summary_sources = []
+        for i, source in enumerate(similar_chunks):
+            if source['type'] == "paragraph":
+                display_source_info(source, index=i)
+            else:
+                display_source_info(source, not_summary=False, index=i)
+
+    with st.spinner("Generating response..."):
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            full_response = ""
+               
+            query_answer = query_data(
+                    question=prompt,
+                    similar_chunks=similar_chunks,
+                    history_messages=chat_history, 
+            )
+                
+            for chunk in query_answer:
+                full_response += chunk
+                message_placeholder.markdown(full_response + "▌")
+            message_placeholder.markdown(full_response)
             
-        for chunk in query_answer:
-            full_response += chunk
-            message_placeholder.markdown(full_response + "▌")
-        message_placeholder.markdown(full_response)
-        
-        chat_history.extend([
-            {"role": "user", "content": prompt}, 
-            {"role": "assistant", "content": full_response}
-        ])
+    chat_history.extend([
+        {"role": "user", "content": prompt}, 
+        {"role": "assistant", "content": full_response}
+    ])
 
 # Main application setup
 def main():
@@ -102,7 +112,7 @@ def main():
 
     display_chat_history(st.session_state.chat_history)
 
-    prompt = st.chat_input("What is up?")
+    prompt = st.chat_input("What would you like to know?")
 
     if prompt:
         handle_user_input(

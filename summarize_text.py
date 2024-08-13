@@ -71,7 +71,8 @@ def summarize_chapter(
 
     starting_prompt = prompt = f"""
         Craft a long outline reflecting the main points of a chapter using Markdown formatting. Adhere to these rules:
-            - Under each header, thoroughly summarize chapter's topics, key terms, and themes in detail. 
+            - Identify the chapter number and title in the first header.
+            - Under each header, thoroughly summarize chapter's topics, key terms, concepts, and themes in detail. 
             - Under the same headers, list pertinent questions raised by the chapter.
         The aim is to organize the chapter's essence into relevant, detailed bullet points and questions.
     """
@@ -106,7 +107,7 @@ def summarize_chapter(
         },
     ]
 
-    if len(chapter_text) < 100 or chapter_text is None:
+    if len(chapter_text) < 5000 or chapter_text is None:
         summary = ''
     else:
         summary = summarize_with_revisions(
