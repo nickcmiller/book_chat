@@ -1,9 +1,10 @@
 import streamlit as st
 import logging
+import time
 
-from query_functions import query_data
+from query_functions import search_vector_db, query_data
 
-file_path = "./extracted_documents/all_books_paragraphs.json"
+
 
 def display_chat_history(
     chat_history: list[dict]
@@ -22,7 +23,9 @@ def display_chat_history(
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-def display_source_info(source: dict) -> None:
+def display_source_info(
+    source: dict
+) -> None:
     """
     Displays the source information in the Streamlit sidebar.
 
@@ -30,21 +33,26 @@ def display_source_info(source: dict) -> None:
     - source (dict): A dictionary containing source information.
     """
     st.sidebar.header(source['title'])
-    st.sidebar.markdown(f"""
+
+    top_text = f"""
     **Author:** {source['author']}
 
     **Chapter:** {source['chapter']}
 
-    **Text:** {source['text']}
-    """)
+    **Text:**\n
+    """
+    st.sidebar.markdown(top_text)
+    with st.sidebar.expander("View Source Text"):
+        st.sidebar.markdown(source['text'])
 
 def handle_user_input(
     prompt: str,
-    chat_history: list[dict]
+    chat_history: list[dict],
+    file_path: str
 ) -> None:
 
     st.sidebar.empty() 
-    chat_history.append({"role": "user", "content": prompt})
+   
 
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -52,36 +60,56 @@ def handle_user_input(
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
-        
-        query_answer, similar_chunks = query_data(
-                question=prompt,
-                file_path=file_path, 
-                history_messages=chat_history, 
-            )
+
+        similar_chunks = search_vector_db(
+            question=prompt,
+            file_path=file_path,
+            history_messages=chat_history,
+        )
+
         for source in similar_chunks:
+            time.sleep(0.1)  # Pause for 100 milliseconds
             display_source_info(source)
+        
+        query_answer = query_data(
+                question=prompt,
+                similar_chunks=similar_chunks,
+                history_messages=chat_history, 
+        )
             
         for chunk in query_answer:
             full_response += chunk
             message_placeholder.markdown(full_response + "▌")
         message_placeholder.markdown(full_response)
         
-        chat_history.append({"role": "assistant", "content": full_response})
+        chat_history.extend([
+            {"role": "user", "content": prompt}, 
+            {"role": "assistant", "content": full_response}
+        ])
 
-        
+# Main application setup
+def main():
+    file_path = "./extracted_documents/all_books_paragraphs.json"   
 
-st.set_page_config(
-    page_title="Book Chat",
-    page_icon=":book:",
-    initial_sidebar_state="expanded"
-)
+    st.set_page_config(
+        page_title="Book Chat",
+        page_icon=":book:",
+        initial_sidebar_state="expanded"
+    )
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = [{"role": "assistant", "content": "How may I help?"}]
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = [{"role": "assistant", "content": "How may I help?"}]
 
-display_chat_history(st.session_state.chat_history)
+    display_chat_history(st.session_state.chat_history)
 
-prompt = st.chat_input("What is up?")
+    prompt = st.chat_input("What is up?")
 
-if prompt:
-    handle_user_input(prompt, st.session_state.chat_history)
+    if prompt:
+        handle_user_input(
+            prompt, 
+            st.session_state.chat_history, 
+            file_path
+        )
+
+if __name__ == "__main__":
+    main()

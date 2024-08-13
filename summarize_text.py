@@ -49,13 +49,11 @@ def summarize_chapter(
     chapter_title: str, 
     metadata: Dict[str, Any]
 ):
-    if len(chapter_text) < 100 or chapter_text is None:
-        return None
 
-    chapter=chapter_title, 
-    author=metadata['creator'], 
-    title=metadata['title'],
-    publisher=metadata['publisher'],
+    chapter = chapter_title
+    author = metadata['creator']
+    title = metadata['title']
+    publisher = metadata['publisher']
     
     system_instructions = """
         Adhere to the following formatting rules when creating the outline:
@@ -108,10 +106,13 @@ def summarize_chapter(
         },
     ]
 
-    summary = summarize_with_revisions(
-        text=chapter_text,
-        prompt_list=prompt_list
-    )
+    if len(chapter_text) < 100 or chapter_text is None:
+        summary = ''
+    else:
+        summary = summarize_with_revisions(
+            text=chapter_text,
+            prompt_list=prompt_list
+        )
 
     return {
         'type': 'summary',

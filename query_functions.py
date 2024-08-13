@@ -184,7 +184,8 @@ def generate_answer(
         If there are no sources, then tell me 'No sources found'.
     """
 
-    revised_history_messages = history_messages[-5:-1]
+    revised_history_messages = history_messages[-4:]
+    print(revised_history_messages)
     revised_history_messages.insert(0, {"role": "system", "content": llm_system_prompt})
 
     source_template = """
@@ -228,13 +229,37 @@ def generate_answer(
         ],
     )
 
-def query_data(
+def search_vector_db(
     question: str,
-    file_path: str, 
+    file_path: str,
     history_messages: List[Dict[str, str]], 
     similarity_threshold: float = 0.4,
     filter_limit: int = 15,
     max_similarity_delta: float = 0.075,
+) -> str:
+    start_time = time.time()
+    
+    vectordb_query = create_vectordb_query(question, history_messages)
+    vectordb_end_time = time.time()
+    logging.info(f"\nVectordb duration: {vectordb_end_time - start_time} seconds\n")
+
+    similar_chunks = retrieve_similar_chunks(
+        file_path, 
+        vectordb_query, 
+        similarity_threshold=similarity_threshold,
+        filter_limit=filter_limit,
+        max_similarity_delta=max_similarity_delta,
+    )
+    
+    similar_chunks_end_time = time.time()
+    logging.info(f"\nSimilar chunk retrieval duration: {similar_chunks_end_time - vectordb_end_time} seconds\n")
+
+    return similar_chunks
+
+def query_data(
+    question: str,
+    similar_chunks: List[Dict[str, Any]],
+    history_messages: List[Dict[str, str]], 
 ) -> str:
     """
         Queries the data based on the provided question and history messages.
@@ -274,27 +299,16 @@ def query_data(
 
     start_time = time.time()
     
-    vectordb_query = create_vectordb_query(question, history_messages)
-    vectordb_end_time = time.time()
-    logging.info(f"\nVectordb duration: {vectordb_end_time - start_time} seconds\n")
-
-    similar_chunks = retrieve_similar_chunks(
-        file_path, 
-        vectordb_query, 
-        similarity_threshold=similarity_threshold,
-        filter_limit=filter_limit,
-        max_similarity_delta=max_similarity_delta,
-    )
-    
-    similar_chunks_end_time = time.time()
-    logging.info(f"\nSimilar chunk retrieval duration: {similar_chunks_end_time - vectordb_end_time} seconds\n")
-
     new_query = revise_query(question, history_messages)
 
     new_query_end_time = time.time()
-    logging.info(f"\nNew query duration: {new_query_end_time - similar_chunks_end_time} seconds\n")
+    logging.info(f"\nNew query duration: {new_query_end_time - start_time} seconds\n")
 
-    return generate_answer(new_query, history_messages, similar_chunks), similar_chunks
+    return generate_answer(
+        new_query, 
+        history_messages, 
+        similar_chunks
+    )
 
 if __name__ == "__main__":
     file_path = "./extracted_documents/all_books_paragraphs.json"
