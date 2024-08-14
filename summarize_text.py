@@ -10,7 +10,23 @@ def summarize_with_revisions(
     text: str,
     prompt_list: List[Dict[str, Any]]
 ) -> str:
-    
+    """
+        Summarizes the given text using a list of prompts and model orders.
+
+        Parameters:
+        - text (str): The text to be summarized.
+        - prompt_list (List[Dict[str, Any]]): A list of dictionaries, each containing:
+            - 'prompt' (str): The prompt to be used for summarization.
+            - 'model_order' (List[Dict[str, str]]): The order of models to be used for generating the summary.
+            - 'system_instructions' (str): Instructions for the model on how to generate the summary.
+
+        Returns:
+        - str: The final summary generated from the provided text using the specified prompts and models.
+        
+        The function iterates through the prompt list, creating a structured prompt for each entry and calling
+        the `fallback_text_response` function to generate a summary. The context is updated with each generated
+        summary to provide continuity in the summarization process.
+    """
     current_context = ""
     for p in prompt_list:
         prompt = p['prompt']
@@ -34,6 +50,20 @@ def _create_structured_prompt(
     context: str, 
     text: str
 ) -> str:
+    """
+        Constructs a structured prompt for the model by combining the provided prompt, context, and text.
+
+        Parameters:
+        - prompt (str): The initial prompt that guides the model's response.
+        - context (str): The previous context or summary that provides continuity for the model.
+        - text (str): The chapter text that the model will summarize or analyze.
+
+        Returns:
+        - str: A formatted string that combines the prompt, context, and chapter text, ready for model input.
+
+        This function formats the input for the model by ensuring that the prompt, context, and text are clearly delineated,
+        allowing the model to generate a coherent and contextually relevant response.
+    """
     prompt = f"""
         {prompt}
         {context}
@@ -49,7 +79,19 @@ def summarize_chapter(
     chapter_title: str, 
     metadata: Dict[str, Any]
 ):
+    """
+        Summarizes a chapter by creating a structured outline based on the chapter text and metadata.
 
+        Parameters:
+        - chapter_text (str): The text of the chapter to be summarized.
+        - chapter_title (str): The title of the chapter being summarized.
+        - metadata (Dict[str, Any]): A dictionary containing metadata about the chapter, including the author, title, and publisher.
+
+        Returns:
+        - str: A detailed outline of the chapter, formatted in Markdown, reflecting the main points, key terms, concepts, and themes, along with pertinent questions raised by the chapter.
+
+        The function first constructs a starting prompt that instructs the model to create a long outline reflecting the main points of the chapter. It then defines a second prompt to expand the outline with detailed explanations and insights based on the chapter text. The system instructions ensure that the outline adheres to specific formatting rules for clarity and organization.
+    """
     chapter = chapter_title
     author = metadata['creator']
     title = metadata['title']
@@ -123,59 +165,3 @@ def summarize_chapter(
         'author': author,
         'publisher': publisher,
     }
-
-if __name__ == '__main__':
-    from genai_toolbox.helper_functions.string_helpers import retrieve_file
-    from genai_toolbox.chunk_and_embed.embedding_functions import create_openai_embedding, find_similar_chunks
-    import os
-    import json
-    from concurrent.futures import ThreadPoolExecutor
-
-    
-
-    summaries = []
-
-    # with ThreadPoolExecutor() as executor:
-    #     # Submit tasks for each text file
-    #     futures = {
-    #         executor.submit(
-    #             summarize_file, 
-    #             filename
-    #         ): filename for filename in os.listdir(directory) if filename.endswith('.txt')
-    #     }
-        
-    #     for future in futures:
-    #         summary_entry = future.result()
-    #         summaries.append(summary_entry)
-
-    # with open('extracted_documents/all_summaries.json', 'w') as json_file:
-    #     json.dump(summaries, json_file, indent=4)
-
-   
-
-    # from genai_toolbox.chunk_and_embed.embedding_functions import (
-    #     create_openai_embedding, 
-    #     embed_dict_list
-    # )
-
-    # summaries = retrieve_file('extracted_documents/all_summaries.json')
-    # embedded_summaries = embed_dict_list(
-    #     embedding_function=create_openai_embedding,
-    #     chunk_dicts=summaries,
-    #     model_choice = 'text-embedding-3-large',
-    #     metadata_keys=[ 'chapter', 'title', 'author']
-    # )
-    # with open('extracted_documents/all_embedded_summaries.json', 'w') as json_file:
-    #     json.dump(embedded_summaries, json_file, indent=4)
-
-
-    with open('extracted_documents/all_embedded_summaries.json', 'r') as json_file:
-        embedded_summaries = json.load(json_file)
-
-    with open('extracted_documents/all_books_paragraphs.json', 'r') as json_file:
-        all_books_paragraphs = json.load(json_file)
-    
-    all_books_paragraphs.extend(embedded_summaries)
-
-    with open('extracted_documents/all_books_paragraphs.json', 'w') as json_file:
-        json.dump(all_books_paragraphs, json_file, indent=4)

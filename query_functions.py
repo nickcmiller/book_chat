@@ -174,9 +174,9 @@ def generate_answer(
         
         Text that cites source 1 for a second time.[1]
         ```
-        If there are no sources, then tell me 'No sources found'.
+        Give a thorough, detailed, in-depth answer.
 
-        Give a detailed answer.
+        If there are no sources, then tell me 'No sources found'.
     """
 
     revised_history_messages = history_messages[-4:]
