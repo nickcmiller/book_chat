@@ -57,7 +57,7 @@ def handle_user_input(
     file_path: str
 ) -> None:
     st.sidebar.empty() 
-    st.sidebar.title("References")
+    st.sidebar.title("Sources")
    
     with st.chat_message("user"):
         st.markdown(prompt)

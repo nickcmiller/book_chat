@@ -166,17 +166,17 @@ def generate_answer(
     llm_system_prompt = f"""
         Use numbered references (e.g. [1]) to cite the chapters that are given to you.
         If the same source is used multiple times, refer to the same number for citations.
-        Do not refer to the source material in your text, only in your number citations
-        
+        Do not refer to the source material in your text, only in your number citations.
+
         Example:
         ```
         Text that is referring to the first source.[1] Text that cites sources 2 and 3.[2][3]
         
         Text that cites source 1 for a second time.[1]
         ```
+        If there are no sources, then tell me 'No sources found'.
 
         Give a detailed answer.
-        If there are no sources, then tell me 'No sources found'.
     """
 
     revised_history_messages = history_messages[-4:]
