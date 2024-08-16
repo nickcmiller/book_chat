@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from genai_toolbox.text_prompting.model_calls import openai_text_response, groq_text_response
+from genai_toolbox.text_prompting.model_calls import openai_text_response, groq_text_response, fallback_text_response
 from genai_toolbox.chunk_and_embed.embedding_functions import create_openai_embedding, find_similar_chunks
 from genai_toolbox.helper_functions.string_helpers import retrieve_file
 from genai_toolbox.chunk_and_embed.llms_with_queries import llm_response_with_query, stream_response_with_query
@@ -16,32 +16,22 @@ def filter_by_criteria(
     filter_list: List[Dict[str, Any]],
     field_mapping: Dict[str, str]
 ) -> List[Dict[str, Any]]:
-    """
-    Filter a list of dictionaries based on specified criteria.
-
-    Args:
-    dict_list (List[Dict[str, Any]]): The list of dictionaries to filter.
-    filter_list (List[Dict[str, Any]]): The list of filter criteria.
-    field_mapping (Dict[str, str]): Mapping of filter fields to dict_list fields.
-
-    Returns:
-    List[Dict[str, Any]]: The filtered list of dictionaries.
-    """
     if not filter_list:
         return dict_list
 
     start_time = time.time()
-    result = [
-        item for item in dict_list
+    result = []
+    for item in dict_list:
         if any(
             all(
-                item.get(dict_field) == filter_item.get(filter_field)
-                for filter_field, dict_field in field_mapping.items()
-                if filter_item.get(filter_field) is not None
+                item.get(field_mapping[filter_field]) == filter_item.get(filter_field)
+                for filter_field in filter_item
+                if filter_field in field_mapping and filter_item.get(filter_field) is not None
             )
             for filter_item in filter_list
-        )
-    ]
+        ):
+            result.append(item)
+
     end_time = time.time()
     logging.info(f"Filtering by criteria duration: {end_time - start_time} seconds\n")
 
@@ -74,6 +64,47 @@ def format_messages(
         formatted_messages.extend(messages_to_use)
 
     return formatted_messages
+
+def fallback_query(
+    prompt: str,
+    system_instructions: str = None,
+    history_messages: List[Dict[str, Any]] = None,
+) -> str:
+    if history_messages is None:
+        history_messages = []
+
+    formatted_messages = format_messages(
+        system_instructions=system_instructions, 
+        history_messages=history_messages,
+        history_limit=4
+    )
+
+    fallback_model_order = [
+        {
+            "provider": "openai", 
+            "model": "4o-mini"
+        },
+        {
+            "provider": "groq", 
+            "model": "llama3.1-70b"
+        },
+        {
+            "provider": "anthropic", 
+            "model": "sonnet"
+        }
+    ] 
+
+    try:
+        response = fallback_text_response(
+            prompt, 
+            system_instructions, 
+            formatted_messages,
+            model_order=fallback_model_order
+        )
+        return response
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        return "Sorry, I don't understand."
 
 def groq_query(
     prompt: str, 
@@ -159,7 +190,7 @@ def _create_vectordb_query(
 
     vectordb_system_instructions = "You expand on questions asked to a vector database containing chunks of transcripts. You add sub-questions and contextual details to make the query more specific and relevant to the chat history."
 
-    vectordb_query = groq_query(
+    vectordb_query = fallback_query(
         prompt=vectordb_prompt, 
         system_instructions=vectordb_system_instructions, 
         history_messages=history_messages
@@ -290,7 +321,7 @@ def _revise_query(
     """
     revision_system_instructions = "You are an assistant that concisely and carefully rewrites questions. The less than (<) and greater than (>) signs are telling you to refer to the chat history. Don't use < or > in your response."
 
-    new_query = groq_query(
+    new_query = fallback_query(
         prompt=revision_prompt,
         system_instructions=revision_system_instructions, 
         history_messages=history_messages

@@ -5,6 +5,7 @@ import time
 from query_functions import search_vector_db, query_data, filter_by_criteria
 from genai_toolbox.helper_functions.string_helpers import retrieve_file
 from typing import List, Dict, Any
+import json
 
 def select_books_and_chapters(
     path_to_book_index: str,
@@ -28,9 +29,6 @@ def select_books_and_chapters(
 
     with col2:
         _select_chapters(all_chapters)
-    
-    if not st.session_state.selected_chapters and st.session_state.selected_books:
-        st.warning("No specific chapters selected. All chapters from the selected books will be available for searching.")
 
 def _select_books(
     book_index: Dict[str, Any]
@@ -106,11 +104,20 @@ def handle_user_input(
         st.markdown(prompt)
 
     with st.spinner("Searching for sources..."):
-        filtered_chapters = _retrieve_and_filter_chapters(paragraphs_filepath, filtered_chapters)
+        # If no chapters are selected, use all chapters from selected books
+        if not filtered_chapters and st.session_state.selected_books:
+            print(f"Selected books: {st.session_state.selected_books}")
+            filtered_chapters = _get_chapters_for_books(
+                st.session_state.book_index,
+                st.session_state.selected_books
+            )
+            print(f"filtered_chapters after none selected: {len(filtered_chapters)}")
+
+        retrieved_chapters = _retrieve_and_filter_chapters(paragraphs_filepath, filtered_chapters)
 
         similar_chunks = search_vector_db(
             question=prompt,
-            dict_list=filtered_chapters,
+            dict_list=retrieved_chapters,
             history_messages=chat_history,
         )
 
@@ -146,25 +153,33 @@ def _retrieve_and_filter_chapters(
     paragraphs_filepath: str,
     filtered_chapters: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
-    # Check if index_list is already in session state
+    print(f"filtered_chapters input: {len(filtered_chapters)}")
+    print(f"filtered_chapters keys: {filtered_chapters[0].keys()}")
+    print(f"filtered_chapter: {json.dumps(filtered_chapters, indent=2)}")
+    
     if 'index_list' not in st.session_state:
         st.session_state.index_list = retrieve_file(paragraphs_filepath)
     
     print(f"index_list: {len(st.session_state.index_list)}")
     
-    # Generate a unique key for filtered_chapters based on the current selection
     filtered_key = "filtered_chapters_" + "_".join(sorted([f"{c['book']}_{c['chapter']}" for c in filtered_chapters]))
-    
-    # Check if filtered_chapters for the current selection is already in session state
+    print(f"filtered_key: {filtered_key}")
+
     if filtered_key not in st.session_state:
         st.session_state[filtered_key] = filter_by_criteria(
             st.session_state.index_list, 
             filtered_chapters, 
-            {"title": "book", "chapter": "chapter"}
+            {"book":"title", "chapter": "chapter"}
         )
     
-    print(f"filtered_chapters: {len(st.session_state[filtered_key])}")
-    return st.session_state[filtered_key]
+    retrieved_chapters = st.session_state[filtered_key]
+    print(f"retrieved_chapters: {len(retrieved_chapters)}")
+    
+    # Add this section to verify the filtered results
+    for chapter in retrieved_chapters[:5]:  # Print first 5 chapters for verification
+        print(f"Book: {chapter['title']}, Chapter: {chapter['chapter']}")
+
+    return retrieved_chapters
 
 def display_source_info(
     source: dict,
