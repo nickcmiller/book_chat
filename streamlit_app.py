@@ -2,7 +2,56 @@ import streamlit as st
 import logging
 import time
 
-from query_functions import search_vector_db, query_data
+from query_functions import search_vector_db, query_data, get_unique_values, filter_json_by_key_value
+from genai_toolbox.helper_functions.string_helpers import retrieve_file
+from typing import List, Dict, Any
+
+def select_books(book_index: Dict[str, Any]) -> None:
+    if 'selected_books' not in st.session_state:
+        st.session_state.selected_books = []
+    
+    # Let Streamlit handle the state update
+    st.multiselect('Select Book:', book_index['books'], key='selected_books')
+    print("selected_books: ", st.session_state.selected_books)
+
+def get_chapters_for_books(book_index: Dict[str, Any], selected_books: List[str]) -> List[str]:
+    all_chapters = []
+    for book in selected_books:
+        all_chapters.extend(book_index['chapters'][book])
+    return all_chapters
+
+def select_chapters(all_chapters: List[str]) -> None:
+    if 'selected_chapters' not in st.session_state:
+        st.session_state.selected_chapters = []
+    
+    # Filter out any previously selected chapters that are no longer available
+    st.session_state.selected_chapters = [
+        chapter for chapter in st.session_state.selected_chapters
+        if chapter in all_chapters
+    ]
+    
+    # Let Streamlit handle the state update
+    st.multiselect(
+        'Select Chapter:', 
+        all_chapters, 
+        default=st.session_state.selected_chapters,
+        key='selected_chapters'
+    )
+    print("selected_chapters: ", st.session_state.selected_chapters)
+
+def select_books_and_chapters(book_index: Dict[str, Any]) -> None:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        select_books(book_index)
+    
+    all_chapters = get_chapters_for_books(book_index, st.session_state.selected_books)
+    
+    with col2:
+        select_chapters(all_chapters)
+    
+    if not st.session_state.selected_chapters and st.session_state.selected_books:
+        st.warning("No specific chapters selected. All chapters from the selected books will be available for searching.")
 
 def display_chat_history(
     chat_history: list[dict]
@@ -54,8 +103,10 @@ def display_source_info(
 def handle_user_input(
     prompt: str,
     chat_history: list[dict],
-    file_path: str
+    filtered_chapters: List[Dict[str, Any]]
 ) -> None:
+    book_list= retrieve_file("./extracted_documents/all_books_paragraphs.json" )
+
     st.sidebar.empty() 
     st.sidebar.title("Sources")
    
@@ -63,9 +114,10 @@ def handle_user_input(
         st.markdown(prompt)
 
     with st.spinner("Searching for sources..."):
+        # print(f"filtered_chapters: {len(filtered_chapters)}")
         similar_chunks = search_vector_db(
             question=prompt,
-            file_path=file_path,
+            dict_list=filtered_chapters,
             history_messages=chat_history,
         )
 
@@ -99,13 +151,24 @@ def handle_user_input(
 
 # Main application setup
 def main():
-    file_path = "./extracted_documents/all_books_paragraphs.json"   
-
     st.set_page_config(
         page_title="Book Chat",
         page_icon=":book:",
         initial_sidebar_state="expanded"
     )
+
+    book_index = retrieve_file("./extracted_documents/book_and_chapter_index.json")
+
+    # Initialize session state for selected chapters if it doesn't exist
+    if 'selected_chapters' not in st.session_state:
+        st.session_state.selected_chapters = []
+
+    # Call select_books_and_chapters and update session state
+    new_selected_chapters = select_books_and_chapters(book_index)
+    if new_selected_chapters:
+        st.session_state.selected_chapters = new_selected_chapters
+
+    print("selected_chapters: ", st.session_state.selected_chapters)
 
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = [{"role": "assistant", "content": "How may I help?"}]
@@ -116,9 +179,9 @@ def main():
 
     if prompt:
         handle_user_input(
-            prompt, 
-            st.session_state.chat_history, 
-            file_path
+            prompt=prompt, 
+            chat_history=st.session_state.chat_history, 
+            filtered_chapters=filtered_chapters,
         )
 
 if __name__ == "__main__":

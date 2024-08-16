@@ -9,6 +9,86 @@ from genai_toolbox.chunk_and_embed.llms_with_queries import llm_response_with_qu
 from typing import List, Optional, Dict, Any, Callable, Generator
 import logging
 import time
+import json
+
+def get_unique_values(
+    extracted_list: List[Dict[str, Any]], 
+    key: str
+) -> List[Any]:
+    """
+        Retrieve a list of unique values for a specific key in the extracted list.
+
+        Args:
+        extracted_list (List[Dict[str, Any]]): The list of dictionaries to process.
+        key (str): The dictionary key to retrieve unique values for.
+
+        Returns:
+        List[Any]: A list of unique values for the specified key.
+    """
+    try:
+        unique_values = list(set(item.get(key) for item in extracted_list if key in item))
+        logging.info(f"Number of unique values for '{key}': {len(unique_values)}")
+        return sorted(unique_values, key=lambda x: (x.isdigit(), x))
+    except Exception as e:
+        logging.error(f"An error occurred while retrieving unique values: {str(e)}")
+        return []
+
+def filter_json_by_key_value(
+    extracted_list: List[Dict[str, Any]], 
+    key: str, 
+    values: List[Any]
+) -> List[Dict[str, Any]]:
+    """
+    Filter a list of dictionaries based on a particular key matching a specific value.
+
+    Args:
+    extracted_list (List[Dict[str, Any]]): The list of dictionaries to filter.
+    key (str): The dictionary key to match.
+    value (Any): The value to match for the given key.
+
+    Returns:
+    List[Dict[str, Any]]: A list of dictionaries that match the filter criteria.
+    """
+    filtered_list = []
+    
+    try:
+        filtered_list = [item for item in extracted_list if item.get(key) in values]
+
+        logging.info(f"Filtered list length: {len(filtered_list)}")
+        return filtered_list
+    
+    except Exception as e:
+        logging.error(f"An error occurred while filtering the list: {str(e)}")
+    
+    return []
+
+def format_messages(
+    history_messages: List[Dict[str, Any]],
+    system_instructions: str = None, 
+    history_limit: Optional[int] = 6
+) -> List[Dict[str, str]]:
+    """Format the messages for the OpenAI API."""
+    
+    if history_limit is None:
+        history_limit = len(history_messages)
+    else:
+        history_limit = int(history_limit)
+    messages_to_use = history_messages[-history_limit:]
+
+    formatted_messages = []
+
+    if system_instructions:
+        formatted_messages.append({
+            "role": "system", 
+            "content": system_instructions
+        })
+        for message in messages_to_use:
+            if message["role"] != "system":
+                formatted_messages.append(message)
+    else:
+        formatted_messages.extend(messages_to_use)
+
+    return formatted_messages
 
 def groq_query(
     prompt: str, 
@@ -33,10 +113,10 @@ def groq_query(
     if history_messages is None:
         history_messages = []
 
-    formatted_messages = _format_messages(
-        prompt, 
-        system_instructions, 
-        history_messages
+    formatted_messages = format_messages(
+        system_instructions=system_instructions, 
+        history_messages=history_messages,
+        history_limit=4
     )
 
     try:
@@ -51,42 +131,23 @@ def groq_query(
         logging.error(f"Error: {e}")
         return "Sorry, I don't understand."
 
-def _format_messages(
-    prompt: str, 
-    system_instructions: str, 
-    history_messages: List[Dict[str, Any]]
-) -> List[Dict[str, str]]:
-    """Format the messages for the OpenAI API."""
-    formatted_messages = []
-    if system_instructions:
-        formatted_messages.append({
-            "role": "system", 
-            "content": system_instructions
-        })
-    formatted_messages.extend(history_messages)
-    # formatted_messages.append({
-    #     "role": "user", 
-    #     "content": prompt
-    # })
-
-    return formatted_messages
-
 def search_vector_db(
     question: str,
-    file_path: str,
-    history_messages: List[Dict[str, str]], 
+    dict_list: List[Dict[str, Any]],
+    history_messages: List[Dict[str, str]],
     similarity_threshold: float = 0.4,
     filter_limit: int = 15,
     max_similarity_delta: float = 0.075,
 ) -> List[Dict[str, Any]]:
-    start_time = time.time()
     
+    start_time = time.time()
     vectordb_query = _create_vectordb_query(question, history_messages)
     vectordb_end_time = time.time()
+    
     logging.info(f"\nVectordb duration: {vectordb_end_time - start_time} seconds\n")
 
     similar_chunks = _retrieve_similar_chunks(
-        file_path, 
+        dict_list, 
         vectordb_query, 
         similarity_threshold=similarity_threshold,
         filter_limit=filter_limit,
@@ -124,7 +185,7 @@ def _create_vectordb_query(
     return vectordb_query
 
 def _retrieve_similar_chunks(
-    file_path: str,
+    extracted_list: List[Dict[str, Any]],
     query: str, 
     similarity_threshold: float,
     filter_limit: int,
@@ -155,11 +216,6 @@ def _retrieve_similar_chunks(
 
         This function is essential for enabling the system to respond to user queries by identifying relevant information based on semantic similarity.
     """
-    extracted_list = retrieve_file(file_path)
-    if not extracted_list:
-        logging.error(f"No data extracted from file: {file_path}")
-        return []
-
     similar_chunks = find_similar_chunks(
         query, 
         extracted_list, 
@@ -218,7 +274,6 @@ def query_data(
         - Tuple[str, List[Dict[str, str]]]: A tuple containing the generated answer as a string and 
         a list of similar chunks retrieved from the data source.
     """
-    print(f"\n\nDQ HISTORY MESSAGES: {history_messages}\n\n")
 
     start_time = time.time()
     
@@ -307,8 +362,11 @@ def _generate_answer(
         If there are no sources, then tell me 'No sources found'.
     """
 
-    revised_history_messages = history_messages[-4:]
-    revised_history_messages.insert(0, {"role": "system", "content": llm_system_prompt})
+    formatted_history_messages = format_messages(
+        history_messages=history_messages,
+        system_instructions=llm_system_prompt,
+        history_limit=6
+    )
 
     source_template = """
     Book: *{title}*
@@ -321,7 +379,7 @@ def _generate_answer(
     return stream_response_with_query(
         similar_chunks,
         question=query,
-        history_messages=revised_history_messages,
+        history_messages=formatted_history_messages,
         source_template=source_template,
         template_args={
             "title": "title", 
@@ -350,15 +408,25 @@ def _generate_answer(
         ],
     )
 
-
 if __name__ == "__main__":
     file_path = "./extracted_documents/all_books_paragraphs.json"
-    history_messages = [
-        {"role": "system", "content": "Why are babies so smart?"},
-        {"role": "assistant", "content": "Babies are born with a certain level of intelligence, but it depends on the environment and the individual's upbringing."},
-    ]
-    query = "Can you go into more detail?"
+    extracted_list = retrieve_file(file_path)
+    if not extracted_list:
+        logging.error(f"No data extracted from file: {file_path}")
 
-    response = query_data(query, file_path, history_messages)
-    for chunk in response:
-        print(chunk)
+    print(f"Extracted list length: {len(extracted_list)}")
+
+    unique_values = get_unique_values(extracted_list, "chapter")
+    print(f"Unique values: {json.dumps(unique_values, indent=2)}")
+
+
+
+    # history_messages = [
+    #     {"role": "system", "content": "Why are babies so smart?"},
+    #     {"role": "assistant", "content": "Babies are born with a certain level of intelligence, but it depends on the environment and the individual's upbringing."},
+    # ]
+    # query = "Can you go into more detail?"
+
+    # response = query_data(query, file_path, history_messages)
+    # for chunk in response:
+    #     print(chunk)

@@ -5,6 +5,7 @@ import logging
 from typing import List, Dict, Any
 import concurrent.futures
 from functools import partial
+from collections import defaultdict
 
 import ebooklib
 from ebooklib import epub
@@ -29,6 +30,9 @@ from summarize_text import summarize_chapter
 from genai_toolbox.chunk_and_embed.embedding_functions import (
     create_openai_embedding, 
     embed_dict_list
+)
+from genai_toolbox.helper_functions.string_helpers import (
+    retrieve_file
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -299,12 +303,13 @@ def process_books(
             book_paragraphs_filepath = process_book(book_path)
             if book_paragraphs_filepath:
                 book_paragraphs_filepaths.append(book_paragraphs_filepath)
-                print(f"Book paragraphs filepath: {book_paragraphs_filepath}")
+                logging.info(f"Book paragraphs filepath: {book_paragraphs_filepath}")
         except Exception as e:
             logging.error(f"Error processing book {book_path}: {str(e)}")
+    combined_file_path = _combine_consolidated_paragraphs(book_paragraphs_filepaths)
+    create_index(combined_file_path)
 
-    # After processing all books, combine their consolidated paragraphs
-    return _combine_consolidated_paragraphs(book_paragraphs_filepaths)
+    return combined_file_path
 
 def _combine_consolidated_paragraphs(
     book_paragraphs_filepaths: List[str]
@@ -326,22 +331,58 @@ def _combine_consolidated_paragraphs(
     """
     all_paragraphs = []
     for filepath in book_paragraphs_filepaths:
-        print(f"Filepath: {filepath}")
+        logging.info(f"Filepath: {filepath}")
         if os.path.exists(filepath):
             with open(filepath, 'r', encoding='utf-8') as f:
                 book_paragraphs = json.load(f)
-                print(f"Length of book paragraphs: {len(book_paragraphs)}")
+                logging.info(f"Length of book paragraphs: {len(book_paragraphs)}")
                 all_paragraphs.extend(book_paragraphs)
-                print(f"Length of all paragraphs: {len(all_paragraphs)}")
+                logging.info(f"Length of all paragraphs: {len(all_paragraphs)}")
     
     if all_paragraphs:
-        combined_file = os.path.join(EXTRACTED_DIR, "all_books_paragraphs.json")
-        safe_write_file(all_paragraphs, combined_file)
-        logging.info(f"Combined paragraphs from all books saved to: {combined_file}")
-        return combined_file
+        combined_file_path = os.path.join(EXTRACTED_DIR, "all_books_paragraphs.json")
+        safe_write_file(all_paragraphs, combined_file_path)
+        logging.info(f"Combined paragraphs from all books saved to: {combined_file_path}")
+        return combined_file_path
     else:
         logging.warning("No paragraphs found to combine.")
         return None
+
+def create_index(
+    file_path: str
+) -> None:
+    """
+        Creates an index for the vector database.
+    """
+    book_and_chapter_dict = _filter_books_and_chapters(file_path)
+    index_file_path = os.path.join(EXTRACTED_DIR, "book_and_chapter_index.json")
+    safe_write_file(book_and_chapter_dict, index_file_path)
+    logging.info(f"Book and chapter index saved to: {index_file_path}")
+
+def _filter_books_and_chapters(
+    json_file_path: str
+) -> Dict[str, Any]:
+    with open(json_file_path, 'r') as file:
+        data = json.load(file)
+
+    books = set()
+    chapters = defaultdict(set)
+
+    for item in data:
+        if 'title' in item and 'chapter' in item:
+            books.add(item['title'])
+            chapters[item['title']].add(item['chapter'])
+
+    result = {
+        "books": sorted(list(books)),
+        "chapters": {book: sorted(list(chapter_set), key=_natural_sort_key) 
+                     for book, chapter_set in sorted(chapters.items())}
+    }
+
+    return result
+
+def _natural_sort_key(s):
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', s)]
 
 if __name__ == "__main__":
     book_paths = [
@@ -353,16 +394,18 @@ if __name__ == "__main__":
         '../The AI Mirror_ How to Reclaim Our Humanity in an Age of -- Shannon Vallor -- 2024 copy.epub'
     ]
    
-    process_books(book_paths)
+    # process_books(book_paths)
 
     book_filepaths = [
         'extracted_documents/Reality+/Reality+_all_paragraphs.json',
         'extracted_documents/The_Singularity_Is_Nearer/The_Singularity_Is_Nearer_all_paragraphs.json',
         'extracted_documents/Deep_Utopia/Deep_Utopia_all_paragraphs.json',
         # 'extracted_documents/The_Code_Breaker/The_Code_Breaker_all_paragraphs.json'
-        'extracted_documents/Technology_and_the_Virtues/Technology_and_the_Virtues_all_paragraphs.json',
+        # 'extracted_documents/Technology_and_the_Virtues/Technology_and_the_Virtues_all_paragraphs.json',
+        'extracted_documents/The_AI_Mirror/The_AI_Mirror_all_paragraphs.json'
     ]
-    # _combine_consolidated_paragraphs(book_filepaths)
+    # combined_file_path = _combine_consolidated_paragraphs(book_filepaths)
+    # create_index(combined_file_path)
 
 
      
