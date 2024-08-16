@@ -2,111 +2,103 @@ import streamlit as st
 import logging
 import time
 
-from query_functions import search_vector_db, query_data, get_unique_values, filter_json_by_key_value
+from query_functions import search_vector_db, query_data, filter_by_criteria
 from genai_toolbox.helper_functions.string_helpers import retrieve_file
 from typing import List, Dict, Any
 
-def select_books(book_index: Dict[str, Any]) -> None:
-    if 'selected_books' not in st.session_state:
-        st.session_state.selected_books = []
-    
-    # Let Streamlit handle the state update
-    st.multiselect('Select Book:', book_index['books'], key='selected_books')
-    print("selected_books: ", st.session_state.selected_books)
+def select_books_and_chapters(
+    path_to_book_index: str,
+) -> None:
+    if 'book_index' not in st.session_state:
+        st.session_state.book_index = retrieve_file(path_to_book_index)
 
-def get_chapters_for_books(book_index: Dict[str, Any], selected_books: List[str]) -> List[str]:
-    all_chapters = []
-    for book in selected_books:
-        all_chapters.extend(book_index['chapters'][book])
-    return all_chapters
-
-def select_chapters(all_chapters: List[str]) -> None:
-    if 'selected_chapters' not in st.session_state:
-        st.session_state.selected_chapters = []
-    
-    # Filter out any previously selected chapters that are no longer available
-    st.session_state.selected_chapters = [
-        chapter for chapter in st.session_state.selected_chapters
-        if chapter in all_chapters
-    ]
-    
-    # Let Streamlit handle the state update
-    st.multiselect(
-        'Select Chapter:', 
-        all_chapters, 
-        default=st.session_state.selected_chapters,
-        key='selected_chapters'
-    )
-    print("selected_chapters: ", st.session_state.selected_chapters)
-
-def select_books_and_chapters(book_index: Dict[str, Any]) -> None:
     col1, col2 = st.columns(2)
     
     with col1:
-        select_books(book_index)
+        _select_books(st.session_state.book_index)
     
-    all_chapters = get_chapters_for_books(book_index, st.session_state.selected_books)
-    
+    # Ensure that chapters are updated when books are selected
+    if 'selected_books' in st.session_state:
+        all_chapters = _get_chapters_for_books(
+            st.session_state.book_index, 
+            st.session_state.selected_books
+        )
+    else:
+        all_chapters = []
+
     with col2:
-        select_chapters(all_chapters)
+        _select_chapters(all_chapters)
     
     if not st.session_state.selected_chapters and st.session_state.selected_books:
         st.warning("No specific chapters selected. All chapters from the selected books will be available for searching.")
 
-def display_chat_history(
-    chat_history: list[dict]
+def _select_books(
+    book_index: Dict[str, Any]
 ) -> None:
-    """
-        Displays the chat history in the Streamlit application.
+    if 'selected_books' not in st.session_state:
+        st.session_state.selected_books = []
+    
+    selected_books = st.multiselect(
+        'Select Book:', 
+        book_index['books'], 
+        key='book_selector'
+    )
+    st.session_state.selected_books = selected_books
 
-        Parameters:
-        - chat_history (list[dict]): A list of dictionaries representing the chat history, 
-        where each dictionary contains the role (user or assistant) and the content of the message.
-
-        This function iterates through the chat history and displays each message in the chat interface.
-        Messages are displayed according to their role, using the appropriate Streamlit chat message format.
-    """
-    for message in chat_history:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-def display_source_info(
-    source: dict,
-    not_summary: bool = True,
-    index: int = None
+def _select_chapters(
+    all_chapters: List[Dict[str, str]]
 ) -> None:
-    """
-    Displays the source information in the Streamlit sidebar.
+    if 'selected_chapters' not in st.session_state:
+        st.session_state.selected_chapters = []
+    
+    chapter_display_names = [f"{chapter['chapter']} - {chapter['book']}" for chapter in all_chapters]
+    
+    def update_selected_chapters():
+        st.session_state.selected_chapters = [
+            chapter for chapter in all_chapters 
+            if f"{chapter['chapter']} - {chapter['book']}" in st.session_state.chapter_selector
+        ]
 
-    Parameters:
-    - source (dict): A dictionary containing source information.
-    - summary (bool): A boolean indicating whether the source is a summary or not.
-    """
+        import json
+        print("Selected Chapters:", json.dumps(st.session_state.selected_chapters, indent=2))
 
-    top_text = f"""
-    **Author:** {source['author']}
+    selected_chapters = st.multiselect(
+        'Select Chapter:', 
+        options=chapter_display_names,
+        default=[f"{chapter['chapter']} - {chapter['book']}" for chapter in st.session_state.selected_chapters if f"{chapter['chapter']} - {chapter['book']}" in chapter_display_names],
+        key='chapter_selector',
+        on_change=update_selected_chapters
+    )
+    
+    # Update session state only if the selection has changed
+    new_selected_chapters = [
+        chapter for chapter in all_chapters 
+        if f"{chapter['chapter']} - {chapter['book']}" in selected_chapters
+    ]
+    
+    if new_selected_chapters != st.session_state.selected_chapters:
+        st.session_state.selected_chapters = new_selected_chapters
 
-    **Chapter:** {source['chapter']}
+        import json
+        print("Selected Books:", json.dumps(st.session_state.selected_books, indent=2))
+        # st.rerun()
 
-    """
-    if not_summary:
-        top_text += f"**Text:**\n"
-    else:
-        top_text += f"**AI Generated Summary:**\n"
-
-    with st.sidebar:
-        st.header(f"{index + 1}: {source['title']}")
-        st.markdown(top_text)
-        with st.expander(label="Expand Text", expanded=not_summary):
-            st.markdown(source['text'])
+def _get_chapters_for_books(
+    book_index: Dict[str, Any], 
+    selected_books: List[str]
+) -> List[Dict[str, str]]:
+    all_chapters = []
+    for book in selected_books:
+        all_chapters.extend([{"book": book, "chapter": chapter} for chapter in book_index['chapters'][book]])
+    return all_chapters
 
 def handle_user_input(
     prompt: str,
     chat_history: list[dict],
+    paragraphs_filepath: str,
     filtered_chapters: List[Dict[str, Any]]
 ) -> None:
-    book_list= retrieve_file("./extracted_documents/all_books_paragraphs.json" )
-
+    
     st.sidebar.empty() 
     st.sidebar.title("Sources")
    
@@ -114,7 +106,8 @@ def handle_user_input(
         st.markdown(prompt)
 
     with st.spinner("Searching for sources..."):
-        # print(f"filtered_chapters: {len(filtered_chapters)}")
+        filtered_chapters = _retrieve_and_filter_chapters(paragraphs_filepath, filtered_chapters)
+
         similar_chunks = search_vector_db(
             question=prompt,
             dict_list=filtered_chapters,
@@ -149,6 +142,78 @@ def handle_user_input(
         {"role": "assistant", "content": full_response}
     ])
 
+def _retrieve_and_filter_chapters(
+    paragraphs_filepath: str,
+    filtered_chapters: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    # Check if index_list is already in session state
+    if 'index_list' not in st.session_state:
+        st.session_state.index_list = retrieve_file(paragraphs_filepath)
+    
+    print(f"index_list: {len(st.session_state.index_list)}")
+    
+    # Generate a unique key for filtered_chapters based on the current selection
+    filtered_key = "filtered_chapters_" + "_".join(sorted([f"{c['book']}_{c['chapter']}" for c in filtered_chapters]))
+    
+    # Check if filtered_chapters for the current selection is already in session state
+    if filtered_key not in st.session_state:
+        st.session_state[filtered_key] = filter_by_criteria(
+            st.session_state.index_list, 
+            filtered_chapters, 
+            {"title": "book", "chapter": "chapter"}
+        )
+    
+    print(f"filtered_chapters: {len(st.session_state[filtered_key])}")
+    return st.session_state[filtered_key]
+
+def display_source_info(
+    source: dict,
+    not_summary: bool = True,
+    index: int = None
+) -> None:
+    """
+    Displays the source information in the Streamlit sidebar.
+
+    Parameters:
+    - source (dict): A dictionary containing source information.
+    - summary (bool): A boolean indicating whether the source is a summary or not.
+    """
+
+    top_text = f"""
+    **Author:** {source['author']}
+
+    **Chapter:** {source['chapter']}
+
+    """
+    if not_summary:
+        top_text += f"**Text:**\n"
+    else:
+        top_text += f"**AI Generated Summary:**\n"
+
+    with st.sidebar:
+        st.header(f"{index + 1}: {source['title']}")
+        st.markdown(top_text)
+        with st.expander(label="Expand Text", expanded=not_summary):
+            st.markdown(source['text'])
+
+
+def display_chat_history(
+    chat_history: list[dict]
+) -> None:
+    """
+        Displays the chat history in the Streamlit application.
+
+        Parameters:
+        - chat_history (list[dict]): A list of dictionaries representing the chat history, 
+        where each dictionary contains the role (user or assistant) and the content of the message.
+
+        This function iterates through the chat history and displays each message in the chat interface.
+        Messages are displayed according to their role, using the appropriate Streamlit chat message format.
+    """
+    for message in chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
 # Main application setup
 def main():
     st.set_page_config(
@@ -157,18 +222,8 @@ def main():
         initial_sidebar_state="expanded"
     )
 
-    book_index = retrieve_file("./extracted_documents/book_and_chapter_index.json")
-
-    # Initialize session state for selected chapters if it doesn't exist
-    if 'selected_chapters' not in st.session_state:
-        st.session_state.selected_chapters = []
-
-    # Call select_books_and_chapters and update session state
-    new_selected_chapters = select_books_and_chapters(book_index)
-    if new_selected_chapters:
-        st.session_state.selected_chapters = new_selected_chapters
-
-    print("selected_chapters: ", st.session_state.selected_chapters)
+    path_to_book_index = "./extracted_documents/book_and_chapter_index.json"
+    select_books_and_chapters(path_to_book_index)
 
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = [{"role": "assistant", "content": "How may I help?"}]
@@ -181,7 +236,8 @@ def main():
         handle_user_input(
             prompt=prompt, 
             chat_history=st.session_state.chat_history, 
-            filtered_chapters=filtered_chapters,
+            paragraphs_filepath="./extracted_documents/all_books_paragraphs.json",
+            filtered_chapters=st.session_state.selected_chapters,
         )
 
 if __name__ == "__main__":

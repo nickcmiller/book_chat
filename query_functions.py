@@ -11,56 +11,41 @@ import logging
 import time
 import json
 
-def get_unique_values(
-    extracted_list: List[Dict[str, Any]], 
-    key: str
-) -> List[Any]:
-    """
-        Retrieve a list of unique values for a specific key in the extracted list.
-
-        Args:
-        extracted_list (List[Dict[str, Any]]): The list of dictionaries to process.
-        key (str): The dictionary key to retrieve unique values for.
-
-        Returns:
-        List[Any]: A list of unique values for the specified key.
-    """
-    try:
-        unique_values = list(set(item.get(key) for item in extracted_list if key in item))
-        logging.info(f"Number of unique values for '{key}': {len(unique_values)}")
-        return sorted(unique_values, key=lambda x: (x.isdigit(), x))
-    except Exception as e:
-        logging.error(f"An error occurred while retrieving unique values: {str(e)}")
-        return []
-
-def filter_json_by_key_value(
-    extracted_list: List[Dict[str, Any]], 
-    key: str, 
-    values: List[Any]
+def filter_by_criteria(
+    dict_list: List[Dict[str, Any]],
+    filter_list: List[Dict[str, Any]],
+    field_mapping: Dict[str, str]
 ) -> List[Dict[str, Any]]:
     """
-    Filter a list of dictionaries based on a particular key matching a specific value.
+    Filter a list of dictionaries based on specified criteria.
 
     Args:
-    extracted_list (List[Dict[str, Any]]): The list of dictionaries to filter.
-    key (str): The dictionary key to match.
-    value (Any): The value to match for the given key.
+    dict_list (List[Dict[str, Any]]): The list of dictionaries to filter.
+    filter_list (List[Dict[str, Any]]): The list of filter criteria.
+    field_mapping (Dict[str, str]): Mapping of filter fields to dict_list fields.
 
     Returns:
-    List[Dict[str, Any]]: A list of dictionaries that match the filter criteria.
+    List[Dict[str, Any]]: The filtered list of dictionaries.
     """
-    filtered_list = []
-    
-    try:
-        filtered_list = [item for item in extracted_list if item.get(key) in values]
+    if not filter_list:
+        return dict_list
 
-        logging.info(f"Filtered list length: {len(filtered_list)}")
-        return filtered_list
-    
-    except Exception as e:
-        logging.error(f"An error occurred while filtering the list: {str(e)}")
-    
-    return []
+    start_time = time.time()
+    result = [
+        item for item in dict_list
+        if any(
+            all(
+                item.get(dict_field) == filter_item.get(filter_field)
+                for filter_field, dict_field in field_mapping.items()
+                if filter_item.get(filter_field) is not None
+            )
+            for filter_item in filter_list
+        )
+    ]
+    end_time = time.time()
+    logging.info(f"Filtering by criteria duration: {end_time - start_time} seconds\n")
+
+    return result
 
 def format_messages(
     history_messages: List[Dict[str, Any]],
@@ -144,7 +129,7 @@ def search_vector_db(
     vectordb_query = _create_vectordb_query(question, history_messages)
     vectordb_end_time = time.time()
     
-    logging.info(f"\nVectordb duration: {vectordb_end_time - start_time} seconds\n")
+    logging.info(f"Vectordb duration: {vectordb_end_time - start_time} seconds\n")
 
     similar_chunks = _retrieve_similar_chunks(
         dict_list, 
@@ -155,7 +140,7 @@ def search_vector_db(
     )
     
     similar_chunks_end_time = time.time()
-    logging.info(f"\nSimilar chunk retrieval duration: {similar_chunks_end_time - vectordb_end_time} seconds\n")
+    logging.info(f"Similar chunk retrieval duration: {similar_chunks_end_time - vectordb_end_time} seconds\n")
 
     return similar_chunks
 
@@ -280,7 +265,7 @@ def query_data(
     new_query = _revise_query(question, history_messages)
 
     new_query_end_time = time.time()
-    logging.info(f"\nNew query duration: {new_query_end_time - start_time} seconds\n")
+    logging.info(f"New query duration: {new_query_end_time - start_time} seconds\n")
 
     return _generate_answer(
         new_query, 
