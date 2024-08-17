@@ -81,12 +81,12 @@ def fallback_query(
 
     fallback_model_order = [
         {
-            "provider": "openai", 
-            "model": "4o-mini"
-        },
-        {
             "provider": "groq", 
             "model": "llama3.1-70b"
+        },
+        {
+            "provider": "openai", 
+            "model": "4o-mini"
         },
         {
             "provider": "anthropic", 
@@ -296,7 +296,7 @@ def query_data(
     new_query = _revise_query(question, history_messages)
 
     new_query_end_time = time.time()
-    logging.info(f"New query duration: {new_query_end_time - start_time} seconds\n")
+    logging.info(f"New query duration: {new_query_end_time - start_time} seconds\n\n\n")
 
     return _generate_answer(
         new_query, 
@@ -311,15 +311,12 @@ def _revise_query(
     revision_prompt = f"""
         When possible, rewrite the question using <chat history> to identify the intent of the question, the people referenced by the question, and ideas / topics / themes targeted by the question in <chat history>.
         If the <chat history> does not contain any information about the people, ideas, or topics relevant to the question, then do not make any assumptions.
-        The rewrite should be concise and direct. It should end with a ? mark.
-        If the user requests a format or style, include that requested format or style in the rewrite.
-        Only return the request. Don't preface it or provide an introductory message.
-
+        
         ---
         Question: {question}
         ---
     """
-    revision_system_instructions = "You are an assistant that concisely and carefully rewrites questions. The less than (<) and greater than (>) signs are telling you to refer to the chat history. Don't use < or > in your response."
+    revision_system_instructions = "You are an assistant that concisely and carefully rewrites questions. The less than (<) and greater than (>) signs are telling you to refer to the chat history. Don't use < or > in your response. The rewrite should be concise and direct. It should end with a ? mark. If the user requests a format or style, include that requested format or style in the rewrite. Example: If the user asks for an outline, include the request for an outline in the rewrite. Only return the request. Don't preface it or provide an introductory message."
 
     new_query = fallback_query(
         prompt=revision_prompt,
@@ -402,7 +399,6 @@ def _generate_answer(
             "text": "text", 
             "author": "author", 
             "chapter": "chapter", 
-            "publisher": "publisher"
         },
         llm_model_order=[
             {

@@ -57,9 +57,6 @@ def _select_chapters(
             if f"{chapter['chapter']} - {chapter['book']}" in st.session_state.chapter_selector
         ]
 
-        import json
-        print("Selected Chapters:", json.dumps(st.session_state.selected_chapters, indent=2))
-
     selected_chapters = st.multiselect(
         'Select Chapter:', 
         options=chapter_display_names,
@@ -68,7 +65,6 @@ def _select_chapters(
         on_change=update_selected_chapters
     )
     
-    # Update session state only if the selection has changed
     new_selected_chapters = [
         chapter for chapter in all_chapters 
         if f"{chapter['chapter']} - {chapter['book']}" in selected_chapters
@@ -76,10 +72,6 @@ def _select_chapters(
     
     if new_selected_chapters != st.session_state.selected_chapters:
         st.session_state.selected_chapters = new_selected_chapters
-
-        import json
-        print("Selected Books:", json.dumps(st.session_state.selected_books, indent=2))
-        # st.rerun()
 
 def _get_chapters_for_books(
     book_index: Dict[str, Any], 
@@ -93,40 +85,27 @@ def _get_chapters_for_books(
 def handle_user_input(
     prompt: str,
     chat_history: list[dict],
-    paragraphs_filepath: str,
     filtered_chapters: List[Dict[str, Any]]
-) -> None:
-    
-    st.sidebar.empty() 
-    st.sidebar.title("Sources")
-   
+) -> None:   
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.spinner("Searching for sources..."):
-        # If no chapters are selected, use all chapters from selected books
         if not filtered_chapters and st.session_state.selected_books:
-            print(f"Selected books: {st.session_state.selected_books}")
             filtered_chapters = _get_chapters_for_books(
                 st.session_state.book_index,
                 st.session_state.selected_books
             )
-            print(f"filtered_chapters after none selected: {len(filtered_chapters)}")
 
-        retrieved_chapters = _retrieve_and_filter_chapters(paragraphs_filepath, filtered_chapters)
+        retrieved_chapters = _retrieve_and_filter_chapters(filtered_chapters)
 
         similar_chunks = search_vector_db(
             question=prompt,
             dict_list=retrieved_chapters,
             history_messages=chat_history,
         )
-
-        summary_sources = []
-        for i, source in enumerate(similar_chunks):
-            if source['type'] == "paragraph":
-                display_source_info(source, index=i)
-            else:
-                display_source_info(source, not_summary=False, index=i)
+        # Update sidebar content
+        update_sidebar_content(similar_chunks)
 
     with st.spinner("Generating response..."):
         with st.chat_message("assistant"):
@@ -150,20 +129,10 @@ def handle_user_input(
     ])
 
 def _retrieve_and_filter_chapters(
-    paragraphs_filepath: str,
     filtered_chapters: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
-    print(f"filtered_chapters input: {len(filtered_chapters)}")
-    print(f"filtered_chapters keys: {filtered_chapters[0].keys()}")
-    print(f"filtered_chapter: {json.dumps(filtered_chapters, indent=2)}")
-    
-    if 'index_list' not in st.session_state:
-        st.session_state.index_list = retrieve_file(paragraphs_filepath)
-    
-    print(f"index_list: {len(st.session_state.index_list)}")
-    
+        
     filtered_key = "filtered_chapters_" + "_".join(sorted([f"{c['book']}_{c['chapter']}" for c in filtered_chapters]))
-    print(f"filtered_key: {filtered_key}")
 
     if filtered_key not in st.session_state:
         st.session_state[filtered_key] = filter_by_criteria(
@@ -173,44 +142,8 @@ def _retrieve_and_filter_chapters(
         )
     
     retrieved_chapters = st.session_state[filtered_key]
-    print(f"retrieved_chapters: {len(retrieved_chapters)}")
-    
-    # Add this section to verify the filtered results
-    for chapter in retrieved_chapters[:5]:  # Print first 5 chapters for verification
-        print(f"Book: {chapter['title']}, Chapter: {chapter['chapter']}")
 
     return retrieved_chapters
-
-def display_source_info(
-    source: dict,
-    not_summary: bool = True,
-    index: int = None
-) -> None:
-    """
-    Displays the source information in the Streamlit sidebar.
-
-    Parameters:
-    - source (dict): A dictionary containing source information.
-    - summary (bool): A boolean indicating whether the source is a summary or not.
-    """
-
-    top_text = f"""
-    **Author:** {source['author']}
-
-    **Chapter:** {source['chapter']}
-
-    """
-    if not_summary:
-        top_text += f"**Text:**\n"
-    else:
-        top_text += f"**AI Generated Summary:**\n"
-
-    with st.sidebar:
-        st.header(f"{index + 1}: {source['title']}")
-        st.markdown(top_text)
-        with st.expander(label="Expand Text", expanded=not_summary):
-            st.markdown(source['text'])
-
 
 def display_chat_history(
     chat_history: list[dict]
@@ -229,17 +162,89 @@ def display_chat_history(
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
+def create_and_display_sidebar():
+    with st.sidebar:
+        st.title("Sources")
+        
+        if 'sidebar_content' not in st.session_state:
+            st.session_state.sidebar_content = []
+        
+        # Create a container for the dynamic content
+        sidebar_container = st.container()
+        
+        # Use st.empty() to create a placeholder that we can update
+        sidebar_placeholder = st.empty()
+    
+    # Store the container and placeholder in session state
+    st.session_state.sidebar_container = sidebar_container
+    st.session_state.sidebar_placeholder = sidebar_placeholder
+    
+    logging.info("Sidebar created and displayed")
+
+def update_sidebar_content(new_content):
+    st.session_state.sidebar_content = new_content
+    print(f"length of new content in update_sidebar_content: {len(new_content)}")
+    
+    # Update the sidebar content using the placeholder
+    with st.session_state.sidebar_placeholder.container():
+        if new_content:
+            for i, source in enumerate(new_content):
+                display_source_info(source, index=i)
+        else:
+            st.write("No relevant sources available.")
+
+def display_source_info(
+    source: dict,    
+    index: int = None
+) -> None:
+    """
+    Displays the source information in the Streamlit sidebar.
+
+    Parameters:
+    - source (dict): A dictionary containing source information.
+    """
+
+    top_text = f"""
+    **Author:** {source['author']}
+
+    **Chapter:** {source['chapter']}
+
+    """
+    is_paragraph = source['type'] == "paragraph"
+
+    if is_paragraph:
+        top_text += f"**Text:**\n"
+    else:
+        top_text += f"**AI Generated Summary:**\n"
+
+    with st.sidebar:
+        st.header(f"{index + 1}: {source['title']}")
+        st.markdown(top_text)
+        with st.expander(label="Expand Text", expanded=is_paragraph):
+            st.markdown(source['text'])
+        
 # Main application setup
 def main():
+    PARAGRAPHS_FILEPATH = "./extracted_documents/all_books_paragraphs.json"
+    BOOK_INDEX_FILEPATH = "./extracted_documents/book_and_chapter_index.json"
+    
     st.set_page_config(
         page_title="Book Chat",
         page_icon=":book:",
         initial_sidebar_state="expanded"
     )
-
-    path_to_book_index = "./extracted_documents/book_and_chapter_index.json"
-    select_books_and_chapters(path_to_book_index)
-
+    
+    
+    if 'index_list' not in st.session_state:
+        with st.spinner("Loading database..."):
+            start_time = time.time()
+            st.session_state.index_list = retrieve_file(PARAGRAPHS_FILEPATH)
+            end_time = time.time()
+            logging.info(f"\n\n{'-'*100}\nDatabase loaded successfully in {end_time - start_time} seconds\n\n")
+    
+    create_and_display_sidebar()
+    select_books_and_chapters(BOOK_INDEX_FILEPATH)
+    
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = [{"role": "assistant", "content": "How may I help?"}]
 
@@ -251,7 +256,6 @@ def main():
         handle_user_input(
             prompt=prompt, 
             chat_history=st.session_state.chat_history, 
-            paragraphs_filepath="./extracted_documents/all_books_paragraphs.json",
             filtered_chapters=st.session_state.selected_chapters,
         )
 
