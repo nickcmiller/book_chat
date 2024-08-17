@@ -1,5 +1,6 @@
 import os
 import json
+import copy
 import re
 import logging
 from typing import List, Dict, Any
@@ -32,7 +33,8 @@ from genai_toolbox.chunk_and_embed.embedding_functions import (
     embed_dict_list
 )
 from genai_toolbox.helper_functions.string_helpers import (
-    retrieve_file
+    retrieve_file,
+    write_to_file
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -251,7 +253,12 @@ def process_book(
     book_paragraphs_filepath = _save_consolidated_paragraphs(embedded_paragraphs, book_name, output_dir)
     logging.info(f"Finished processing book: {book_path}")
 
-    return book_paragraphs_filepath
+    result = {
+        "name": book_name, 
+        "paragraphs_filepath": book_paragraphs_filepath
+    }
+
+    return result
 
 def _save_consolidated_paragraphs(
     all_paragraphs: List[Dict[str, Any]],
@@ -297,21 +304,24 @@ def process_books(
         Returns:
             str: The filepath of the combined paragraphs file, or None if no paragraphs were found.
     """
-    book_paragraphs_filepaths = []
+    book_paragraphs = []
     for book_path in book_paths:
         try:
-            book_paragraphs_filepath = process_book(book_path)
-            if book_paragraphs_filepath:
-                book_paragraphs_filepaths.append(book_paragraphs_filepath)
-                logging.info(f"Book paragraphs filepath: {book_paragraphs_filepath}")
+            book_dict = process_book(book_path)
+            name = book_dict['name']
+            paragraphs_filepath = book_dict['paragraphs_filepath']
+            if paragraphs_filepath:
+                book_paragraphs.append({
+                    "name": name,
+                    "paragraphs_filepath": paragraphs_filepath
+                })
+                logging.info(f"Book {name} paragraphs complete")
         except Exception as e:
             logging.error(f"Error processing book {book_path}: {str(e)}")
-    combined_file_path = _combine_consolidated_paragraphs(book_paragraphs_filepaths)
-    create_index(combined_file_path)
+    
+    return book_paragraphs
 
-    return combined_file_path
-
-def _combine_consolidated_paragraphs(
+def combine_consolidated_paragraphs(
     book_paragraphs_filepaths: List[str]
 ) -> str:
     """
@@ -349,13 +359,14 @@ def _combine_consolidated_paragraphs(
         return None
 
 def create_index(
-    file_path: str
+    file_path: str, 
+    index_dir: str = EXTRACTED_DIR
 ) -> None:
     """
         Creates an index for the vector database.
     """
     book_and_chapter_dict = _filter_books_and_chapters(file_path)
-    index_file_path = os.path.join(EXTRACTED_DIR, "book_and_chapter_index.json")
+    index_file_path = os.path.join(index_dir, "book_and_chapter_index.json")
     safe_write_file(book_and_chapter_dict, index_file_path)
     logging.info(f"Book and chapter index saved to: {index_file_path}")
 
@@ -384,28 +395,65 @@ def _filter_books_and_chapters(
 def _natural_sort_key(s):
     return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', s)]
 
+def update_book_paragraphs_filepaths(
+    book_paths: List[str],
+    paragraphs_filepath: str = 'book_paragraphs_filepaths.json'
+) -> None:
+    """
+        Updates the book paragraphs filepaths by processing the given book paths
+        and saving the updated filepaths to 'book_paragraphs_filepaths.json'.
+
+        Parameters:
+        - book_paths (List[str]): List of paths to the EPUB files to be processed.
+    """
+    book_paragraphs_filepaths = retrieve_file(paragraphs_filepath)
+
+    new_dict = copy.deepcopy(book_paragraphs_filepaths)
+    
+    book_paragraphs = process_books(book_paths)
+    for book in book_paragraphs:
+        new_dict[book['name']] = book['paragraphs_filepath']
+
+    write_to_file(new_dict, paragraphs_filepath)
+
+def load_and_combine_paragraphs(
+    books_to_load: List[str],
+    paragraphs_filepath: str
+) -> None:
+    """
+        Loads book paragraphs filepaths, combines the paragraphs from specified books,
+        and creates an index for the combined paragraphs.
+    
+        Parameters:
+        - books_to_load (List[str]): List of book names to load.
+        - paragraphs_filepath (str): The path to the JSON file containing book paragraphs filepaths.
+    """
+    book_paragraphs_filepaths = retrieve_file(paragraphs_filepath)
+
+    filepaths_to_load = []
+    
+    for book in books_to_load:
+        filepaths_to_load.append(book_paragraphs_filepaths[book])
+    
+    combined_file_path = combine_consolidated_paragraphs(filepaths_to_load)
+    
+    create_index(combined_file_path, index_dir=EXTRACTED_DIR)
+
+
 if __name__ == "__main__":
     book_paths = [
-        # '../the-code-breaker-jennifer-doudna-gene-editing.epub',
-        # '../Deep Utopia _ Life and Meaning in a Solved World -- Nick Bostrom -- 1, 2024 -- Ideapress Publishing copy.epub',
-        # '../The Singularity Is Nearer _ When We Merge with AI -- Ray Kurzweil -- 2024 -- Penguin Publishing Group -- 0593489411 copy.epub',
-        # '../Reality+ Virtual Worlds and the Problems of Philosophy -- David J. Chalmers -- 2021 -- W. W. Norton & Company copy.epub'
-        # '../Technology and the virtues _ a philosophical guide to a -- Shannon Vallor copy.epub'
-        '../The AI Mirror_ How to Reclaim Our Humanity in an Age of -- Shannon Vallor -- 2024 copy.epub'
+        '../Crack in Creation _ Gene Editing and the Unthinkable Power -- Doudna, Jennifer A.epub'
     ]
-   
-    # process_books(book_paths)
 
-    book_filepaths = [
-        'extracted_documents/Reality+/Reality+_all_paragraphs.json',
-        'extracted_documents/The_Singularity_Is_Nearer/The_Singularity_Is_Nearer_all_paragraphs.json',
-        'extracted_documents/Deep_Utopia/Deep_Utopia_all_paragraphs.json',
-        # 'extracted_documents/The_Code_Breaker/The_Code_Breaker_all_paragraphs.json'
-        # 'extracted_documents/Technology_and_the_Virtues/Technology_and_the_Virtues_all_paragraphs.json',
-        'extracted_documents/The_AI_Mirror/The_AI_Mirror_all_paragraphs.json'
+    update_book_paragraphs_filepaths(book_paths, 'book_paragraphs_filepaths.json')
+
+
+    books_to_load = [
+        "Crack_in_Creation",
+        "The_Code_Breaker",
     ]
-    # combined_file_path = _combine_consolidated_paragraphs(book_filepaths)
-    # create_index(combined_file_path)
+
+    load_and_combine_paragraphs(books_to_load, 'book_paragraphs_filepaths.json')
 
 
      
