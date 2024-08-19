@@ -373,6 +373,23 @@ def create_index(
 def _filter_books_and_chapters(
     json_file_path: str
 ) -> Dict[str, Any]:
+    """
+        Filters the books and chapters from a JSON file.
+
+        Args:
+            json_file_path (str): The path to the JSON file containing book and chapter data.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing a sorted list of unique book titles and 
+            a dictionary of chapters for each book, sorted in natural order.
+
+        This function performs the following steps:
+        1. Opens the specified JSON file and loads its content.
+        2. Initializes a set to store unique book titles and a defaultdict to store chapters.
+        3. Iterates through the loaded data, extracting titles and chapters.
+        4. Sorts the list of books and the chapters for each book using a natural sort key.
+        5. Returns a dictionary containing the sorted list of books and the sorted chapters.
+    """
     with open(json_file_path, 'r') as file:
         data = json.load(file)
 
