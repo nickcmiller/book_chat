@@ -363,7 +363,25 @@ def create_index(
     index_dir: str = EXTRACTED_DIR
 ) -> None:
     """
-        Creates an index for the vector database.
+        Creates an index of books and their chapters from a specified JSON file.
+
+        Args:
+            file_path (str): The path to the JSON file containing book and chapter data.
+            index_dir (str, optional): The directory where the index file will be saved. 
+                                        Defaults to EXTRACTED_DIR.
+
+        This function performs the following steps:
+        1. Calls the _filter_books_and_chapters function to extract and organize book titles 
+           and their corresponding chapters from the provided JSON file.
+        2. Constructs the path for the index file by joining the index_dir with the filename 
+           "book_and_chapter_index.json".
+        3. Saves the resulting dictionary from the filtering process to the index file using 
+           the safe_write_file function.
+        4. Logs the location where the index file has been saved.
+
+        Returns:
+            None: This function does not return a value, but it creates an index file 
+            containing the organized book and chapter data.
     """
     book_and_chapter_dict = _filter_books_and_chapters(file_path)
     index_file_path = os.path.join(index_dir, "book_and_chapter_index.json")
@@ -417,11 +435,30 @@ def update_book_paragraphs_filepaths(
     paragraphs_filepath: str = 'book_paragraphs_filepaths.json'
 ) -> None:
     """
-        Updates the book paragraphs filepaths by processing the given book paths
-        and saving the updated filepaths to 'book_paragraphs_filepaths.json'.
+        Updates the JSON file containing the file paths of book paragraphs.
+
+        This function takes a list of book paths and a file path to a JSON file that stores
+        the mapping of book names to their corresponding paragraph file paths. It retrieves
+        the current mappings, processes the provided book paths to extract their names and
+        corresponding paragraph file paths, and updates the JSON file with the new mappings.
 
         Parameters:
-        - book_paths (List[str]): List of paths to the EPUB files to be processed.
+        - book_paths (List[str]): A list of file paths to the books for which paragraph
+          file paths need to be updated.
+        - paragraphs_filepath (str): The path to the JSON file that contains the current
+          mappings of book names to their paragraph file paths. Defaults to 'book_paragraphs_filepaths.json'.
+
+        Returns:
+        - None: This function does not return any value. It modifies the JSON file in place.
+
+        Steps:
+        1. Retrieve the current book paragraphs file paths from the specified JSON file.
+        2. Create a deep copy of the current mappings to avoid modifying the original data directly.
+        3. Process the provided book paths to extract the book names and their corresponding
+           paragraph file paths.
+        4. Update the deep copied dictionary with the new mappings.
+        5. Write the updated dictionary back to the JSON file, effectively updating the mappings
+           of book names to their paragraph file paths.
     """
     book_paragraphs_filepaths = retrieve_file(paragraphs_filepath)
 
@@ -438,12 +475,33 @@ def load_and_combine_paragraphs(
     paragraphs_filepath: str
 ) -> None:
     """
-        Loads book paragraphs filepaths, combines the paragraphs from specified books,
-        and creates an index for the combined paragraphs.
-    
+        Loads and combines paragraphs from specified books into a single consolidated file.
+
+        This function takes a list of book names to load and a file path to a JSON file that contains
+        the mappings of book names to their corresponding paragraph file paths. It retrieves the file paths
+        for the specified books, combines the contents of these files, and creates an index for the combined
+        paragraphs.
+
         Parameters:
-        - books_to_load (List[str]): List of book names to load.
-        - paragraphs_filepath (str): The path to the JSON file containing book paragraphs filepaths.
+        - books_to_load (List[str]): A list of book names that need to be loaded and combined.
+        - paragraphs_filepath (str): The path to the JSON file that contains the mappings of book names
+          to their corresponding paragraph file paths.
+
+        Returns:
+        - None: This function does not return any value. It modifies the output by creating a consolidated
+          file of paragraphs and an index for it.
+
+        Steps:
+        1. Retrieve the current book paragraphs file paths from the specified JSON file using the
+           `retrieve_file` function.
+        2. Initialize an empty list to store the file paths of the books to be loaded.
+        3. Iterate over the list of books to load:
+            - For each book, append its corresponding file path from the retrieved mappings to the list
+              of file paths to load.
+        4. Call the `combine_consolidated_paragraphs` function with the list of file paths to load,
+           which combines the contents of these files into a single consolidated file.
+        5. Create an index for the combined paragraphs by calling the `create_index` function, passing
+           the path of the combined file and the directory where the index should be stored.
     """
     book_paragraphs_filepaths = retrieve_file(paragraphs_filepath)
 
