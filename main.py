@@ -445,12 +445,12 @@ if __name__ == "__main__":
         '../Crack in Creation _ Gene Editing and the Unthinkable Power -- Doudna, Jennifer A.epub'
     ]
 
-    update_book_paragraphs_filepaths(book_paths, 'book_paragraphs_filepaths.json')
+    # update_book_paragraphs_filepaths(book_paths, 'book_paragraphs_filepaths.json')
 
 
     books_to_load = [
-        "Crack_in_Creation",
-        "The_Code_Breaker",
+        "Reality+",
+        "The_Singularity_Is_Nearer"
     ]
 
     load_and_combine_paragraphs(books_to_load, 'book_paragraphs_filepaths.json')
