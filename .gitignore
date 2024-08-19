@@ -5,3 +5,6 @@ __pycache__
 *.epub
 *.json
 *.html
+
+.DS_Store
+.vscode
