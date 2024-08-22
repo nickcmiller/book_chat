@@ -182,8 +182,8 @@ def _create_vectordb_query(
 
     vectordb_prompt = f"""
         Request: {question}\n\nBased on this request, what request should I make to my vector database?
-        Use prior messages to establish the intent and context of the question. 
-        If any relevant topics, themes, or individuals mentioned in chat history, incorporate them in the request.
+        Use prior messages to thoroughly establish and intent of the context of the question. 
+        If any relevant topics, themes, or individuals mentioned in chat history, incorporate them in the request in detail.
         Significantly lengthen the request and include as many contextual details as possible to enhance the relevance of the query.
         Only return the request. Don't preface it or provide an introductory message.
     """
@@ -193,7 +193,7 @@ def _create_vectordb_query(
     vectordb_query = fallback_query(
         prompt=vectordb_prompt, 
         system_instructions=vectordb_system_instructions, 
-        history_messages=history_messages
+        history_messages=history_messages[-6:]
     )
 
     logging.info(f"Vectordb query: {vectordb_query}")
@@ -308,21 +308,36 @@ def _revise_query(
     question: str,
     history_messages: List[Dict[str, str]], 
 ) -> str:
-    revision_prompt = f"""
-        When possible, rewrite the question using <chat history> to identify the intent of the question, the people referenced by the question, and ideas / topics / themes targeted by the question in <chat history>.
-        If the <chat history> does not contain any information about the people, ideas, or topics relevant to the question, then do not make any assumptions.
-        
+
+    # formatted_history = ""
+    # for message in history_messages[-6:]:
+    #     formatted_history += f"""
+    #         {message['role']}: {message['content']}
+    #     """
+    # print(f"Formatted history: {formatted_history}")
+
+    context_prompt = f"""
+        Use chat history to identify the intent of the question, the people referenced by the question, and ideas / topics / themes targeted by the question in chat history.
+        If the chat history does not contain any information about the people, ideas, or topics relevant to the question, then do not make any assumptions.
+        Analyze the relevance of the question to prior messages.
         ---
         Question: {question}
+    """
+    context_system_instructions = "You are an a research assistant that helps contextualize questions using chat history. The rewrite should be concise and direct. It should end with a ? mark. If the user requests a format or style, include that requested format or style in the rewrite. Example: If the user asks for an outline, include the request for an outline in the rewrite. Only return the request. Don't preface it or provide an introductory message."
+
+    context = fallback_query(
+        prompt=context_prompt,
+        system_instructions=context_system_instructions,
+        history_messages=history_messages[-6:]
+    )
+
+    new_query = f"""
+        Question: {question}
+
+        ---
+        Context for Question: {context}
         ---
     """
-    revision_system_instructions = "You are an assistant that concisely and carefully rewrites questions. The less than (<) and greater than (>) signs are telling you to refer to the chat history. Don't use < or > in your response. The rewrite should be concise and direct. It should end with a ? mark. If the user requests a format or style, include that requested format or style in the rewrite. Example: If the user asks for an outline, include the request for an outline in the rewrite. Only return the request. Don't preface it or provide an introductory message."
-
-    new_query = fallback_query(
-        prompt=revision_prompt,
-        system_instructions=revision_system_instructions, 
-        history_messages=history_messages
-    )
 
     logging.info(f"Revised query: {new_query}")
 

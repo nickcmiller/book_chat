@@ -516,19 +516,20 @@ def load_and_combine_paragraphs(
 
 
 if __name__ == "__main__":
-    book_paths = [
-        '../Crack in Creation _ Gene Editing and the Unthinkable Power -- Doudna, Jennifer A.epub'
-    ]
 
-    # update_book_paragraphs_filepaths(book_paths, 'book_paragraphs_filepaths.json')
+    if False:
+        book_paths = [
+            '../China\'s_Last_Empire_The Great Qing 6_Rowe_William_T copy.epub'
+        ]
 
+        update_book_paragraphs_filepaths(book_paths, 'book_paragraphs_filepaths.json')
 
-    books_to_load = [
-        "Reality+",
-        "The_Singularity_Is_Nearer"
-    ]
+    else:
+        books_to_load = [
+            "China's_Last_Empire"
+        ]
 
-    load_and_combine_paragraphs(books_to_load, 'book_paragraphs_filepaths.json')
+        load_and_combine_paragraphs(books_to_load, 'book_paragraphs_filepaths.json')
 
 
      

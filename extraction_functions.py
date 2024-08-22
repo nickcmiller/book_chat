@@ -188,28 +188,28 @@ def extract_content(
     soup: BeautifulSoup
 ) -> Dict[str, Any]:
     """
-        Extracts content from a BeautifulSoup object and organizes it into a structured format.
+    Extracts content from a BeautifulSoup object and organizes it into a structured format.
 
-        This function scans the provided BeautifulSoup object for specific HTML elements 
-        (headings, paragraphs, images, and spans) and compiles their text and attributes 
-        into a list of dictionaries. Each dictionary represents a piece of content with 
-        its type and relevant information, allowing for easy processing and manipulation 
-        of the extracted data.
+    This function scans the provided BeautifulSoup object for specific HTML elements 
+    (headings, paragraphs, images, spans, divs, and list items) and compiles their text 
+    and attributes into a list of dictionaries.
 
-        Args:
-            soup (BeautifulSoup): The BeautifulSoup object representing the parsed HTML 
-                                document from which to extract content.
+    Args:
+        soup (BeautifulSoup): The BeautifulSoup object representing the parsed HTML 
+                            document from which to extract content.
 
-        Returns:
-            Dict[str, Any]: A dictionary containing a list of content items, where each 
-                            item is a dictionary with keys 'type' and associated data.
+    Returns:
+        Dict[str, Any]: A dictionary containing a list of content items, where each 
+                        item is a dictionary with keys 'type' and associated data.
     """
     content = []
-    for element in soup.find_all(['h1', 'h2', 'h3', 'p', 'img', 'span']):
+    for element in soup.find_all(['h1', 'h2', 'h3', 'p', 'img', 'span', 'div', 'li']):
         if element.name in ['h1', 'h2', 'h3']:
             content.append({'type': 'heading', 'level': int(element.name[1]), 'text': element.text.strip()})
-        elif element.name == 'p':
-            content.append({'type': 'paragraph', 'text': element.text.strip()})
+        elif element.name in ['p', 'div']:
+            content.append({'type': element.name, 'text': element.text.strip()})
+        elif element.name == 'li':
+            content.append({'type': 'list_item', 'text': element.text.strip()})
         elif element.name == 'img':
             content.append({'type': 'image', 'src': element.get('src', ''), 'alt': element.get('alt', '')})
         elif element.name == 'span':
@@ -220,22 +220,6 @@ def extract_content(
 def create_hierarchy(
     content: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
-    """
-        Creates a hierarchical structure from the extracted content, organizing it into sections and subsections.
-
-        This function processes a dictionary containing content items (headings and paragraphs) and organizes them 
-        into a nested list structure. Sections are created for top-level headings (h1 and h2), and subsections are 
-        created for lower-level headings (h3). Each section and subsection contains its respective content, allowing 
-        for a clear representation of the document's structure.
-
-        Args:
-            content (Dict[str, Any]): A dictionary containing a list of content items extracted from a BeautifulSoup 
-                                       object, where each item has a 'type' and associated data.
-
-        Returns:
-            List[Dict[str, Any]]: A list of dictionaries representing the hierarchical structure of the content, 
-                                  where each dictionary can represent a section or subsection with its content.
-    """
     hierarchy = []
     current_section = None
     current_subsection = None
@@ -253,6 +237,17 @@ def create_hierarchy(
         elif item['type'] == 'heading' and item['level'] == 3 and current_section:
             current_subsection = {'type': 'subsection', 'heading': item['text'], 'content': []}
             current_section['content'].append(current_subsection)
+        elif item['type'] in ['paragraph', 'div']:  # Treat 'div' like 'paragraph'
+            if not current_section:
+                current_section = {
+                    'type': 'section',
+                    'heading': None,
+                    'content': []
+                }
+            if current_subsection:
+                current_subsection['content'].append(item)
+            else:
+                current_section['content'].append(item)
         else:
             if not current_section:
                 current_section = {
@@ -260,7 +255,6 @@ def create_hierarchy(
                     'heading': None,
                     'content': []
                 }
-            # Add content directly to the section if there's no current subsection
             if current_subsection:
                 current_subsection['content'].append(item)
             else:
@@ -319,50 +313,13 @@ def extract_paragraphs(
     title: Optional[str] = None,
     min_paragraph_tokens: int = 15
 ) -> List[Dict[str, Any]]:
-    """
-        Extracts paragraphs from the provided hierarchical structure.
-
-        This function traverses the hierarchy of sections and subsections, 
-        extracting paragraphs and associating them with their respective chapter, 
-        author, and title information. Each paragraph is represented as a dictionary 
-        containing its text and metadata.
-
-        Args:
-            hierarchy (List[Dict[str, Any]]): A list of dictionaries representing 
-                the hierarchical structure of the content, where each dictionary 
-                can represent a section, subsection, or paragraph.
-            chapter (Optional[str]): The title of the chapter from which the 
-                paragraphs are extracted. Defaults to None.
-            author (Optional[str]): The author of the content. Defaults to None.
-            title (Optional[str]): The title of the content. Defaults to None.
-
-        Returns:
-            List[Dict[str, Any]]: A list of dictionaries, each representing a 
-                paragraph with its text and associated metadata (chapter, author, 
-                title, section, and subsection).
-    """
     paragraphs = []
 
     def traverse(
         items: List[Dict[str, Any]]
     ) -> None:
-        """
-            Traverses the hierarchical structure of sections and subsections to extract 
-            paragraphs along with their associated metadata.
-
-            This inner function iterates through each item in the provided list of 
-            dictionaries, checking the type of each item. If the item is a paragraph, 
-            it creates a new dictionary containing the paragraph's text and its 
-            associated metadata (chapter, author, title, section, and subsection) 
-            and appends it to the paragraphs list. If the item contains further 
-            content, it recursively calls itself to process that content.
-
-            Args:
-                items (List[Dict[str, Any]]): A list of dictionaries representing 
-                    sections, subsections, or paragraphs in the hierarchy.
-        """
         for item in items:
-            if item['type'] == 'paragraph':
+            if item['type'] in ['paragraph', 'div']:  # Treat 'div' like 'paragraph'
                 new_paragraph = {
                     'type': 'paragraph',
                     'text': item['text'],
