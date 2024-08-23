@@ -517,16 +517,16 @@ def load_and_combine_paragraphs(
 
 if __name__ == "__main__":
 
-    if True:
+    if False:
         book_paths = [
-            '../The Seven Habits Of Highly Effective People -- Covey--Stephen copy.epub'
+            '../The Inevitable -- Kevin Kelly -- 2016 -- Penguin Publishing Group copy.epub'
         ]
 
         update_book_paragraphs_filepaths(book_paths, 'book_paragraphs_filepaths.json')
 
     else:
         books_to_load = [
-            "China's_Last_Empire"
+            "The_Inevitable"
         ]
 
         load_and_combine_paragraphs(books_to_load, 'book_paragraphs_filepaths.json')

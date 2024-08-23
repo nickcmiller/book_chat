@@ -188,28 +188,61 @@ def extract_content(
     soup: BeautifulSoup
 ) -> Dict[str, Any]:
     """
-    Extracts content from a BeautifulSoup object and organizes it into a structured format.
+    extract_content(soup: BeautifulSoup) -> Dict[str, Any]:
+    
+    Extracts structured content from a BeautifulSoup object representing an HTML document.
+    
+    This function traverses the provided BeautifulSoup object and identifies various HTML elements 
+    such as headings, paragraphs, images, and spans. It organizes the extracted information into a 
+    structured format, which can be useful for further processing or analysis.
 
-    This function scans the provided BeautifulSoup object for specific HTML elements 
-    (headings, paragraphs, images, spans, divs, and list items) and compiles their text 
-    and attributes into a list of dictionaries.
+    The function works by searching for specific HTML tags that are commonly used to structure 
+    content in web pages. It processes the following elements:
+    
+        - Headings (h1, h2, h3): These are extracted as sections with their respective levels 
+        indicated. The level of the heading is determined by the tag name (e.g., h1 is level 1, 
+        h2 is level 2, etc.). Each heading is stored in a dictionary with its type, level, and text.
+        - Paragraphs (p): Each paragraph is extracted and stored as a dictionary containing its 
+        type and text content. This allows for easy retrieval and display of paragraph text.
+        - Divs (div): Each div is extracted and stored as a dictionary containing its 
+        type and text content. This allows for easy retrieval and display of div text.
+        - Lists (li): Each list item is extracted and stored as a dictionary containing its 
+        type and text content. This allows for easy retrieval and display of list text.
+        - Images (img): Images are processed to extract their source URL and alt text. This 
+        information is stored in a dictionary, which can be useful for rendering images in a 
+        user interface or for accessibility purposes.
+        - Spans: These elements are also processed to capture their class attributes and text 
+        content. This can be useful for styling or additional processing based on the class of 
+        the span.
+
+    The output of the function is a dictionary containing a list of content items. Each item 
+    in the list is a dictionary that represents a specific type of content, making it easy to 
+    iterate over and manipulate in subsequent processing steps.
 
     Args:
-        soup (BeautifulSoup): The BeautifulSoup object representing the parsed HTML 
-                            document from which to extract content.
-
+        soup (BeautifulSoup): A BeautifulSoup object containing the parsed HTML document.
+    
     Returns:
-        Dict[str, Any]: A dictionary containing a list of content items, where each 
-                        item is a dictionary with keys 'type' and associated data.
+        Dict[str, Any]: A dictionary containing a list of content items, where each item is a 
+        dictionary representing the type of content (e.g., heading, paragraph, image) and its 
+        associated data (e.g., text, source, alt text).
+    
+    The structured output allows for easy access to the content types and their respective data, 
+    facilitating further manipulation or display in applications. This function is particularly 
+    useful in scenarios where content needs to be extracted from web pages for analysis, 
+    transformation, or presentation in a different format.
     """
     content = []
     for element in soup.find_all(['h1', 'h2', 'h3', 'p', 'img', 'span', 'div', 'li']):
         if element.name in ['h1', 'h2', 'h3']:
             content.append({'type': 'heading', 'level': int(element.name[1]), 'text': element.text.strip()})
-        elif element.name in ['p', 'div']:
-            content.append({'type': element.name, 'text': element.text.strip()})
-        elif element.name == 'li':
-            content.append({'type': 'list_item', 'text': element.text.strip()})
+        elif element.name == 'p':
+            content.append({'type': 'paragraph', 'text': element.text.strip()})
+        elif element.name in ['div', 'li']:
+            if not element.find_all(['p', 'h1', 'h2', 'h3', 'img', 'span']):
+                paragraphs = [p.strip() for p in element.text.split('\n\n') if p.strip()]
+                for paragraph in paragraphs:
+                    content.append({'type': 'paragraph', 'text': paragraph})
         elif element.name == 'img':
             content.append({'type': 'image', 'src': element.get('src', ''), 'alt': element.get('alt', '')})
         elif element.name == 'span':
@@ -237,7 +270,7 @@ def create_hierarchy(
         elif item['type'] == 'heading' and item['level'] == 3 and current_section:
             current_subsection = {'type': 'subsection', 'heading': item['text'], 'content': []}
             current_section['content'].append(current_subsection)
-        elif item['type'] in ['paragraph', 'div']:  # Treat 'div' like 'paragraph'
+        elif item['type'] == 'paragraph':  # Changed from ['paragraph', 'div']
             if not current_section:
                 current_section = {
                     'type': 'section',
