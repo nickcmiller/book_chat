@@ -517,9 +517,9 @@ def load_and_combine_paragraphs(
 
 if __name__ == "__main__":
 
-    if False:
+    if True:
         book_paths = [
-            '../China\'s_Last_Empire_The Great Qing 6_Rowe_William_T copy.epub'
+            '../The Seven Habits Of Highly Effective People -- Covey--Stephen copy.epub'
         ]
 
         update_book_paragraphs_filepaths(book_paths, 'book_paragraphs_filepaths.json')

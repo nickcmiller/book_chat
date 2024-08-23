@@ -69,6 +69,7 @@ def fallback_query(
     prompt: str,
     system_instructions: str = None,
     history_messages: List[Dict[str, Any]] = None,
+    history_limit: Optional[int] = 6
 ) -> str:
     if history_messages is None:
         history_messages = []
@@ -76,7 +77,7 @@ def fallback_query(
     formatted_messages = format_messages(
         system_instructions=system_instructions, 
         history_messages=history_messages,
-        history_limit=4
+        history_limit=history_limit
     )
 
     fallback_model_order = [
@@ -151,7 +152,7 @@ def search_vector_db(
     question: str,
     dict_list: List[Dict[str, Any]],
     history_messages: List[Dict[str, str]],
-    similarity_threshold: float = 0.4,
+    similarity_threshold: float = 0.3,
     filter_limit: int = 15,
     max_similarity_delta: float = 0.075,
 ) -> List[Dict[str, Any]]:
@@ -180,21 +181,24 @@ def _create_vectordb_query(
     history_messages: List[Dict[str, str]], 
 ) -> str:
 
-    vectordb_prompt = f"""
-        Request: {question}\n\nBased on this request, what request should I make to my vector database?
-        Use prior messages to thoroughly establish and intent of the context of the question. 
-        If any relevant topics, themes, or individuals mentioned in chat history, incorporate them in the request in detail.
+    context_prompt = f"""
+        Request: {question}\n\nBased on this request, provide context for the query that I should make to my vector database.
+        Use chat history to thoroughly establish the intent of the question, the people referenced by the question, and terms, topics, individuals, or themes targeted by the question in chat history.
+        If any relevant topics, themes, terms, or individuals mentioned in chat history, incorporate them in the request in detail.
         Significantly lengthen the request and include as many contextual details as possible to enhance the relevance of the query.
         Only return the request. Don't preface it or provide an introductory message.
     """
 
-    vectordb_system_instructions = "You expand on questions asked to a vector database containing chunks of transcripts. You add sub-questions and contextual details to make the query more specific and relevant to the chat history."
+    context_system_instructions = "You are an expert on adding context to requests asked to a vector database containing chunks of transcripts. You add sub-questions and contextual details to make the query more specific and relevant to the chat history."
 
-    vectordb_query = fallback_query(
-        prompt=vectordb_prompt, 
-        system_instructions=vectordb_system_instructions, 
-        history_messages=history_messages[-6:]
+    context = fallback_query(
+        prompt=context_prompt, 
+        system_instructions=context_system_instructions, 
+        history_messages=history_messages,
+        history_limit=8
     )
+
+    vectordb_query = f"{question}\n{context}"
 
     logging.info(f"Vectordb query: {vectordb_query}")
 
@@ -245,7 +249,7 @@ def _retrieve_similar_chunks(
     logging.info(f"Retrieved {len(similar_chunks)} similar chunks")
 
     if not similar_chunks:
-        logging.warning(f"No similar rows found for the query embedding.")
+        logging.warning(f"No similar rows found for the query embedding over similarity threshold of {similarity_threshold}.")
         return []
 
     return similar_chunks
@@ -261,22 +265,22 @@ def query_data(
         This function serves as the main entry point for querying the vector database and retrieving relevant 
         information based on the user's question. It performs the following steps:
 
-        1. **History Message Preparation**: It takes the last few messages from the chat history and 
+        1. History Message Preparation: It takes the last few messages from the chat history and 
         prepends a system message to provide context for the query.
 
-        2. **Vector Database Query Creation**: It constructs a query specifically tailored for the vector 
+        2. Vector Database Query Creation: It constructs a query specifically tailored for the vector 
         database using the provided question and the prepared history messages. This helps in understanding 
         the context and intent behind the user's question.
 
-        3. **Retrieving Similar Chunks**: The function then calls another function to retrieve similar chunks 
+        3. Retrieving Similar Chunks: The function then calls another function to retrieve similar chunks 
         of text from the specified file based on the generated vector database query. This step is crucial 
         for finding relevant information that can help answer the user's question.
 
-        4. **Query Revision**: After retrieving similar chunks, it revises the original question to enhance 
+        4. Query Revision: After retrieving similar chunks, it revises the original question to enhance 
         its clarity and relevance based on the chat history. This ensures that the query is as effective as 
         possible in eliciting a useful response.
 
-        5. **Generating the Answer**: Finally, it generates an answer using the revised query, the history 
+        5. Generating the Answer: Finally, it generates an answer using the revised query, the history 
         messages, and the similar chunks retrieved. The function returns both the generated answer and the 
         list of similar chunks for further processing or display.
 
@@ -309,31 +313,22 @@ def _revise_query(
     history_messages: List[Dict[str, str]], 
 ) -> str:
 
-    # formatted_history = ""
-    # for message in history_messages[-6:]:
-    #     formatted_history += f"""
-    #         {message['role']}: {message['content']}
-    #     """
-    # print(f"Formatted history: {formatted_history}")
-
     context_prompt = f"""
-        Use chat history to identify the intent of the question, the people referenced by the question, and ideas / topics / themes targeted by the question in chat history.
-        If the chat history does not contain any information about the people, ideas, or topics relevant to the question, then do not make any assumptions.
-        Analyze the relevance of the question to prior messages.
+        Succinctly and briefly describe how the question is related to the chat history.
         ---
         Question: {question}
     """
-    context_system_instructions = "You are an a research assistant that helps contextualize questions using chat history. The rewrite should be concise and direct. It should end with a ? mark. If the user requests a format or style, include that requested format or style in the rewrite. Example: If the user asks for an outline, include the request for an outline in the rewrite. Only return the request. Don't preface it or provide an introductory message."
+    context_system_instructions = "You are an expert research assistant who helps contextualize questions using chat history. The rewrite should be concise and direct. It should end with a ? mark. If the user requests a format or style, include that requested format or style in the rewrite. Example: If the user asks for an outline, include the request for an outline in the rewrite. Only return the request. Don't preface it or provide an introductory message."
 
     context = fallback_query(
         prompt=context_prompt,
         system_instructions=context_system_instructions,
-        history_messages=history_messages[-6:]
+        history_messages=history_messages,
+        history_limit=6
     )
 
     new_query = f"""
         Question: {question}
-
         ---
         Context for Question: {context}
         ---
