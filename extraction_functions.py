@@ -253,6 +253,42 @@ def extract_content(
 def create_hierarchy(
     content: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
+    """
+        Creates a hierarchical representation of the content extracted from an HTML document.
+
+        This function takes a dictionary containing a list of content items (such as headings and paragraphs)
+        and organizes them into a structured hierarchy. The hierarchy consists of sections and subsections,
+        allowing for a clear representation of the document's structure.
+
+        The function processes each content item and determines its type (heading or paragraph) and level (for headings).
+        It builds sections for top-level headings (h1, h2) and subsections for lower-level headings (h3). Paragraphs
+        are added to the appropriate section or subsection based on their context.
+
+        The output of the function is a list of dictionaries, where each dictionary represents a section or subsection
+        with its associated content. This structured format is useful for further processing, rendering, or analysis
+        of the document's content.
+
+        Args:
+            content (Dict[str, Any]): A dictionary containing a list of content items extracted from an HTML document.
+        
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries representing the hierarchical structure of the content,
+            with sections and subsections containing their respective content items.
+
+        Example:
+            content = {
+                'content': [
+                    {'type': 'heading', 'level': 1, 'text': 'Introduction'},
+                    {'type': 'paragraph', 'text': 'This is the introduction.'},
+                    {'type': 'heading', 'level': 2, 'text': 'Background'},
+                    {'type': 'paragraph', 'text': 'This is the background.'},
+                    {'type': 'heading', 'level': 3, 'text': 'Details'},
+                    {'type': 'paragraph', 'text': 'These are the details.'}
+                ]
+            }
+            hierarchy = create_hierarchy(content)
+            # hierarchy will contain structured sections and subsections based on the headings and paragraphs.
+    """
     hierarchy = []
     current_section = None
     current_subsection = None

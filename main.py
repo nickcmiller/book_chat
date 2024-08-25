@@ -519,14 +519,14 @@ if __name__ == "__main__":
 
     if False:
         book_paths = [
-            '../The Inevitable -- Kevin Kelly -- 2016 -- Penguin Publishing Group copy.epub'
+            '../storyworthy-engage-teach-persuade-and-change-your copy.epub'
         ]
 
         update_book_paragraphs_filepaths(book_paths, 'book_paragraphs_filepaths.json')
 
     else:
         books_to_load = [
-            "The_Inevitable"
+            "Storyworthy"
         ]
 
         load_and_combine_paragraphs(books_to_load, 'book_paragraphs_filepaths.json')
