@@ -526,7 +526,7 @@ if __name__ == "__main__":
 
     else:
         books_to_load = [
-            "Storyworthy"
+            "China's_Last_Empire"
         ]
 
         load_and_combine_paragraphs(books_to_load, 'book_paragraphs_filepaths.json')

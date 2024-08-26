@@ -16,6 +16,36 @@ def filter_by_criteria(
     filter_list: List[Dict[str, Any]],
     field_mapping: Dict[str, str]
 ) -> List[Dict[str, Any]]:
+    """
+        Filters a list of dictionaries based on specified criteria.
+
+        This function takes a list of dictionaries and filters it according to a list of filter criteria.
+        Each filter criterion is a dictionary that specifies the conditions that must be met for an item
+        in the input list to be included in the output list. The function uses a field mapping to determine
+        which fields in the input dictionaries correspond to the fields in the filter criteria.
+
+        Parameters:
+        - dict_list (List[Dict[str, Any]]): The list of dictionaries to be filtered.
+        - filter_list (List[Dict[str, Any]]): A list of dictionaries containing the filter criteria.
+        - field_mapping (Dict[str, str]): A mapping of filter fields to the corresponding fields in the input dictionaries.
+
+        Returns:
+        - List[Dict[str, Any]]: A list of dictionaries that meet the specified filter criteria.
+
+        Functionality:
+            1. If the filter_list is empty, the function returns the original dict_list.
+            2. It measures the time taken to perform the filtering operation for logging purposes.
+            3. It iterates through each item in dict_list and checks if it matches any of the filter criteria.
+            4. If an item matches, it is added to the result list.
+            5. Finally, it logs the duration of the filtering operation and returns the filtered list.
+
+        Example:
+            dict_list = [{'name': 'Alice', 'age': 30}, {'name': 'Bob', 'age': 25}]
+            filter_list = [{'name': 'Alice'}, {'age': 25}]
+            field_mapping = {'name': 'name', 'age': 'age'}
+            filtered = filter_by_criteria(dict_list, filter_list, field_mapping)
+            # filtered will contain [{'name': 'Alice', 'age': 30}, {'name': 'Bob', 'age': 25}]
+    """
     if not filter_list:
         return dict_list
 
@@ -42,8 +72,34 @@ def format_messages(
     system_instructions: str = None, 
     history_limit: Optional[int] = 6
 ) -> List[Dict[str, str]]:
-    """Format the messages for the OpenAI API."""
-    
+    """
+        Formats the chat history messages for use in a conversational AI model.
+
+        This function takes a list of history messages and formats them according to the specified system instructions
+        and history limit. It ensures that the most relevant messages are included in the final output, which is 
+        essential for maintaining context in conversations.
+
+        Parameters:
+        - history_messages (List[Dict[str, Any]]): A list of dictionaries representing the chat history, 
+          where each dictionary contains the role (user or assistant) and the content of the message.
+        - system_instructions (str, optional): Instructions for the model to follow while generating the response.
+        - history_limit (Optional[int]): The maximum number of history messages to include in the formatted messages. 
+          If None, all messages are included. Defaults to 6.
+
+        Returns:
+        - List[Dict[str, str]]: A list of formatted messages ready for use in the AI model, including the system 
+          instructions if provided.
+
+        Example:
+            history_messages = [
+                {"role": "user", "content": "Hello!"},
+                {"role": "assistant", "content": "Hi there! How can I help you today?"},
+                {"role": "user", "content": "I need assistance with my order."}
+            ]
+            formatted = format_messages(history_messages, system_instructions="You are a helpful assistant.")
+            # formatted will contain the system instructions followed by the last 6 messages from history.
+    """
+
     if history_limit is None:
         history_limit = len(history_messages)
     else:
@@ -71,6 +127,35 @@ def fallback_query(
     history_messages: List[Dict[str, Any]] = None,
     history_limit: Optional[int] = 6
 ) -> str:
+    """
+        Fallback Query Function
+
+        This function is responsible for generating a response based on a given prompt, system instructions, 
+        and chat history messages. It formats the messages appropriately for the OpenAI API and attempts to 
+        retrieve a response from a series of fallback models in a specified order. If an error occurs during 
+        the response retrieval, it logs the error and returns a default message indicating that the query 
+        could not be understood.
+
+        Parameters:
+        - prompt (str): The prompt that guides the model's response generation.
+        - system_instructions (str, optional): Instructions for the model to follow while generating the response.
+        - history_messages (List[Dict[str, Any]], optional): A list of previous messages in the chat history 
+          to provide context for the response.
+        - history_limit (Optional[int], optional): The maximum number of history messages to include in the 
+          formatted messages. If None, all messages are included. Defaults to 6.
+
+        Returns:
+        - str: The generated response from the model, or a default error message if an exception occurs.
+
+        Example:
+            response = fallback_query(
+                prompt="What is the capital of France?",
+                system_instructions="Provide a concise answer.",
+                history_messages=[{"role": "user", "content": "Tell me about France."}],
+                history_limit=3
+            )
+            # response will contain the model's answer to the prompt.
+    """
     if history_messages is None:
         history_messages = []
 
@@ -156,7 +241,28 @@ def search_vector_db(
     filter_limit: int = 15,
     max_similarity_delta: float = 0.075,
 ) -> List[Dict[str, Any]]:
-    
+    """
+        Searches the vector database for similar chunks of text based on the provided question and chat history.
+
+        This function first creates a query for the vector database using the provided question and chat history. 
+        It then retrieves similar chunks of text from the database based on the generated query, logging the duration 
+        of each operation for performance monitoring. The function is designed to help in finding relevant information 
+        that can assist in answering the user's question effectively.
+
+        Parameters:
+        - question (str): The user's question that needs to be answered.
+        - dict_list (List[Dict[str, Any]]): A list of dictionaries representing the data in the vector database.
+        - history_messages (List[Dict[str, str]]): A list of dictionaries representing the chat history, 
+          where each dictionary contains the role (user or assistant) and the content of the message.
+        - similarity_threshold (float, optional): The minimum similarity score for a chunk to be considered relevant. 
+          Defaults to 0.3.
+        - filter_limit (int, optional): The maximum number of similar chunks to return. Defaults to 15.
+        - max_similarity_delta (float, optional): The maximum allowable difference in similarity scores for filtering. 
+          Defaults to 0.075.
+
+        Returns:
+        - List[Dict[str, Any]]: A list of dictionaries representing the similar chunks retrieved from the vector database.
+    """
     start_time = time.time()
     vectordb_query = _create_vectordb_query(question, history_messages)
     vectordb_end_time = time.time()
