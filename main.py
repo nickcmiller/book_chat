@@ -142,12 +142,10 @@ def _save_chapter_files(
 
         Each file is named using the chapter index and the safe chapter title to ensure uniqueness and avoid file system issues.
     """
-
     os.makedirs(os.path.join(output_dir, 'text'), exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'summaries'), exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'hierarchy'), exist_ok=True)
     os.makedirs(os.path.join(output_dir, 'paragraphs'), exist_ok=True)
-
 
     text_filename = f"{i}_{safe_chapter_title}.txt"
     text_filepath = os.path.join(output_dir, 'text', text_filename)
@@ -526,10 +524,9 @@ if __name__ == "__main__":
 
     else:
         books_to_load = [
-            "China's_Last_Empire"
+            "The_Inevitable",
+            "Reality+",
+            "The_Singularity_Is_Nearer",
         ]
 
         load_and_combine_paragraphs(books_to_load, 'book_paragraphs_filepaths.json')
-
-
-     

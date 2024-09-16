@@ -38,13 +38,6 @@ def filter_by_criteria(
             3. It iterates through each item in dict_list and checks if it matches any of the filter criteria.
             4. If an item matches, it is added to the result list.
             5. Finally, it logs the duration of the filtering operation and returns the filtered list.
-
-        Example:
-            dict_list = [{'name': 'Alice', 'age': 30}, {'name': 'Bob', 'age': 25}]
-            filter_list = [{'name': 'Alice'}, {'age': 25}]
-            field_mapping = {'name': 'name', 'age': 'age'}
-            filtered = filter_by_criteria(dict_list, filter_list, field_mapping)
-            # filtered will contain [{'name': 'Alice', 'age': 30}, {'name': 'Bob', 'age': 25}]
     """
     if not filter_list:
         return dict_list

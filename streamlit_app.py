@@ -43,6 +43,15 @@ def _select_books(
     )
     st.session_state.selected_books = selected_books
 
+def _get_chapters_for_books(
+    book_index: Dict[str, Any], 
+    selected_books: List[str]
+) -> List[Dict[str, str]]:
+    all_chapters = []
+    for book in selected_books:
+        all_chapters.extend([{"book": book, "chapter": chapter} for chapter in book_index['chapters'][book]])
+    return all_chapters
+    
 def _select_chapters(
     all_chapters: List[Dict[str, str]]
 ) -> None:
@@ -73,14 +82,7 @@ def _select_chapters(
     if new_selected_chapters != st.session_state.selected_chapters:
         st.session_state.selected_chapters = new_selected_chapters
 
-def _get_chapters_for_books(
-    book_index: Dict[str, Any], 
-    selected_books: List[str]
-) -> List[Dict[str, str]]:
-    all_chapters = []
-    for book in selected_books:
-        all_chapters.extend([{"book": book, "chapter": chapter} for chapter in book_index['chapters'][book]])
-    return all_chapters
+
 
 def handle_user_input(
     prompt: str,
@@ -132,6 +134,19 @@ def _retrieve_and_filter_chapters(
     filtered_chapters: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
         
+    """
+        Retrieves and filters chapters for a given list of chapters.
+
+        Parameters:
+        - filtered_chapters (List[Dict[str, Any]]): A list of dictionaries representing chapters to be filtered.
+        
+        Returns:
+        - List[Dict[str, Any]]: A list of filtered chapters.
+
+        This function first creates a key based on the input chapters, then checks if the key is in the session state.
+        If it is not, it filters the chapters using `filter_by_criteria` and stores the result in the session state.
+        Finally, it returns the filtered chapters from the session state.
+    """
     filtered_key = "filtered_chapters_" + "_".join(sorted([f"{c['book']}_{c['chapter']}" for c in filtered_chapters]))
 
     if filtered_key not in st.session_state:
@@ -198,10 +213,10 @@ def display_source_info(
     index: int = None
 ) -> None:
     """
-    Displays the source information in the Streamlit sidebar.
+        Displays the source information in the Streamlit sidebar.
 
-    Parameters:
-    - source (dict): A dictionary containing source information.
+        Parameters:
+        - source (dict): A dictionary containing source information.
     """
 
     top_text = f"""
